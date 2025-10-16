@@ -1,6 +1,6 @@
 # Lines of Code Report
 
-**Last Updated**: 2025-10-16 17:22
+**Last Updated**: 2025-10-16 17:24
 **Tool**: [cloc](https://github.com/AlDanial/cloc) + wc
 
 ---
@@ -9,13 +9,13 @@
 
 | Metric | Rust Code | Documentation (.md) | Total |
 |--------|-----------|---------------------|-------|
-| **Lines** | 1,420 | 2,219 | 3,639 |
-| **Comments** | 348 | - | 348 |
-| **Blank Lines** | 319 | - | 319 |
-| **Total Lines** | 2,087 | 2,219 | 4,306 |
-| **Files** | 11 | 10 | 21 |
+| **Lines** | 1,433 | 2,226 | 3,659 |
+| **Comments** | 351 | - | 351 |
+| **Blank Lines** | 324 | - | 324 |
+| **Total Lines** | 2,108 | 2,226 | 4,334 |
+| **Files** | 13 | 10 | 23 |
 
-**Documentation Ratio**: 1.56 lines of docs per line of code
+**Documentation Ratio**: 1.55 lines of docs per line of code
 
 ---
 
@@ -24,10 +24,10 @@
 ```
 Language                     files          blank        comment           code
 -------------------------------------------------------------------------------
-Rust                            11            319            348           1420
+Rust                            13            324            351           1433
 WGSL                             2             36             19            125
 -------------------------------------------------------------------------------
-SUM:                            13            355            367           1545
+SUM:                            15            360            370           1558
 -------------------------------------------------------------------------------
 ```
 
@@ -41,7 +41,9 @@ SUM:                            13            355            367           1545
 | `camera.rs` | 209 | 128 | 81 | 38.8% | ✅ |
 | `lib.rs` | 7 | 7 | 0 | 0.0% | ✅ |
 | `main.rs` | 296 | 296 | 0 | 0.0% | ⚠️ Large |
-| `ocean.rs` | 326 | 290 | 36 | 11.0% | ⚠️ Large |
+| `ocean/mesh.rs` | 222 | 222 | 0 | 0.0% | ⚠️ Large |
+| `ocean/mod.rs` | 34 | 17 | 17 | 50.0% | ✅ |
+| `ocean/system.rs` | 91 | 67 | 24 | 26.4% | ✅ |
 | `params/audio.rs` | 87 | 87 | 0 | 0.0% | ✅ |
 | `params/camera.rs` | 203 | 203 | 0 | 0.0% | ⚠️ Large |
 | `params/mod.rs` | 17 | 17 | 0 | 0.0% | ✅ |
@@ -64,7 +66,7 @@ SUM:                            13            355            367           1545
 | `FLOWFIELD.md` | 97 |
 | `LEARNINGS.md` | 272 |
 | `LEXICON.md` | 84 |
-| `LOC_REPORT.md` | 86 |
+| `LOC_REPORT.md` | 93 |
 | `README.md` | 124 |
 | `VISION.md` | 50 |
 
@@ -74,7 +76,7 @@ SUM:                            13            355            367           1545
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| Docs/Code Ratio | ≥0.3 | 1.56 | ✅ Excellent |
+| Docs/Code Ratio | ≥0.3 | 1.55 | ✅ Excellent |
 | README exists | Yes | ✅ | Met |
 | ARCHITECTURE.md | Optional | ✅ | Optional |
 
