@@ -36,7 +36,7 @@ pub struct OceanPhysics {
 impl Default for OceanPhysics {
     fn default() -> Self {
         Self {
-            grid_size: 512,      // Large enough for good view distance without lag
+            grid_size: 1024,     // Extra large grid pushes wrap boundary far beyond visibility
             grid_spacing_m: 2.0, // Fine spacing for many lines
             wave_speed: 0.5,
 

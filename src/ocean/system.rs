@@ -9,7 +9,7 @@ use crate::params::{AudioReactiveMapping, OceanPhysics};
 /// High-level ocean system with physics and audio-reactive parameters
 pub struct OceanSystem {
     pub grid: OceanGrid,
-    physics: OceanPhysics,
+    pub physics: OceanPhysics,
     mapping: AudioReactiveMapping,
 }
 

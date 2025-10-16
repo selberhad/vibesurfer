@@ -12,6 +12,6 @@ mod render;
 
 // Re-export all types
 pub use audio::{audio_constants, FFTConfig};
-pub use camera::{BasicCameraPath, CameraJourney, CameraPreset, FixedCamera};
+pub use camera::{BasicCameraPath, CameraJourney, CameraPreset, FixedCamera, FloatingCamera};
 pub use ocean::{AudioReactiveMapping, OceanPhysics};
 pub use render::{RecordingConfig, RenderConfig};

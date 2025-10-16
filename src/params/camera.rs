@@ -46,6 +46,33 @@ impl Default for FixedCamera {
     }
 }
 
+/// Floating camera (follows terrain contour at fixed height above surface)
+#[derive(Debug, Clone)]
+pub struct FloatingCamera {
+    /// XZ position (meters)
+    pub position_xz: [f32; 2],
+
+    /// Height above terrain surface (meters)
+    pub height_above_terrain_m: f32,
+
+    /// Look-ahead distance for target (meters)
+    pub look_ahead_m: f32,
+
+    /// Simulated forward velocity (m/s) to flow the grid
+    pub simulated_velocity: f32,
+}
+
+impl Default for FloatingCamera {
+    fn default() -> Self {
+        Self {
+            position_xz: [0.0, 0.0],
+            height_above_terrain_m: 20.0, // Float 20m above terrain
+            look_ahead_m: 150.0,
+            simulated_velocity: 150.0,
+        }
+    }
+}
+
 /// Camera preset selection
 #[derive(Debug, Clone)]
 pub enum CameraPreset {
@@ -57,6 +84,9 @@ pub enum CameraPreset {
 
     /// Fixed preset: stationary camera for debugging
     Fixed(FixedCamera),
+
+    /// Floating preset: follows terrain contour at fixed height above surface
+    Floating(FloatingCamera),
 }
 
 impl Default for CameraPreset {

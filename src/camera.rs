@@ -2,7 +2,12 @@
 
 use glam::{Mat4, Vec3};
 
-use crate::params::{BasicCameraPath, CameraJourney, CameraPreset, FixedCamera, RenderConfig};
+use crate::params::{
+    BasicCameraPath, CameraJourney, CameraPreset, FixedCamera, FloatingCamera, RenderConfig,
+};
+
+/// Type alias for terrain height query function (saves boilerplate in tests)
+type TerrainFn = fn(f32, f32) -> f32;
 
 /// Camera system with procedural journey path
 pub struct CameraSystem {
@@ -19,14 +24,30 @@ impl CameraSystem {
     ///
     /// # Arguments
     /// * `time_s` - Current time in seconds
+    /// * `terrain_height_fn` - Optional function to query terrain height at (x, z) world position
     ///
     /// # Returns
     /// Tuple of (eye_position, target_position)
-    pub fn compute_position_and_target(&self, time_s: f32) -> (Vec3, Vec3) {
+    pub fn compute_position_and_target<F>(
+        &self,
+        time_s: f32,
+        terrain_height_fn: Option<F>,
+    ) -> (Vec3, Vec3)
+    where
+        F: Fn(f32, f32) -> f32,
+    {
         match &self.preset {
             CameraPreset::Cinematic(params) => Self::compute_cinematic_path(params, time_s),
             CameraPreset::Basic(params) => Self::compute_basic_path(params, time_s),
             CameraPreset::Fixed(params) => Self::compute_fixed_path(params),
+            CameraPreset::Floating(params) => {
+                if let Some(ref get_height) = terrain_height_fn {
+                    Self::compute_floating_path(params, time_s, get_height)
+                } else {
+                    // Fallback if no terrain query available
+                    Self::compute_fixed_path(&FixedCamera::default())
+                }
+            }
         }
     }
 
@@ -37,10 +58,45 @@ impl CameraSystem {
         (eye, target)
     }
 
-    /// Get simulated velocity for fixed camera (used to flow grid)
+    /// Compute floating camera path (follows terrain contour)
+    ///
+    /// Note: Camera stays at origin, grid flows backward via simulated_velocity.
+    /// We query terrain at "virtual" position (simulated motion) to get height.
+    fn compute_floating_path<F>(p: &FloatingCamera, time_s: f32, get_height: F) -> (Vec3, Vec3)
+    where
+        F: Fn(f32, f32) -> f32,
+    {
+        // Camera stays at origin (grid flows instead)
+        let x = p.position_xz[0];
+        let z = p.position_xz[1];
+
+        // Query terrain at the "virtual" forward position (where camera would be if moving)
+        let virtual_z = z + p.simulated_velocity * time_s;
+        let terrain_height = get_height(x, virtual_z);
+        let y = terrain_height + p.height_above_terrain_m;
+
+        let eye = Vec3::new(x, y, z);
+
+        // Look ahead and query terrain height at target position
+        let target_x = x;
+        let target_z = z + p.look_ahead_m;
+        let virtual_target_z = virtual_z + p.look_ahead_m;
+        let target_terrain_height = get_height(target_x, virtual_target_z);
+        let target_y = target_terrain_height + p.height_above_terrain_m * 0.6; // Look slightly down
+
+        let target = Vec3::new(target_x, target_y, target_z);
+
+        (eye, target)
+    }
+
+    /// Get simulated velocity for fixed/floating cameras (used to flow grid)
     pub fn get_simulated_velocity(&self) -> Option<Vec3> {
         match &self.preset {
             CameraPreset::Fixed(params) => {
+                // Flow grid forward (positive Z direction)
+                Some(Vec3::new(0.0, 0.0, params.simulated_velocity))
+            }
+            CameraPreset::Floating(params) => {
                 // Flow grid forward (positive Z direction)
                 Some(Vec3::new(0.0, 0.0, params.simulated_velocity))
             }
@@ -101,15 +157,20 @@ impl CameraSystem {
     /// # Arguments
     /// * `time_s` - Current time in seconds
     /// * `render_config` - Rendering configuration (FOV, aspect ratio, etc.)
+    /// * `terrain_height_fn` - Optional function to query terrain height (required for Floating preset)
     ///
     /// # Returns
     /// Tuple of (view_proj_matrix, camera_position)
-    pub fn create_view_proj_matrix(
+    pub fn create_view_proj_matrix<F>(
         &self,
         time_s: f32,
         render_config: &RenderConfig,
-    ) -> (Mat4, Vec3) {
-        let (eye, target) = self.compute_position_and_target(time_s);
+        terrain_height_fn: Option<F>,
+    ) -> (Mat4, Vec3)
+    where
+        F: Fn(f32, f32) -> f32,
+    {
+        let (eye, target) = self.compute_position_and_target(time_s, terrain_height_fn);
 
         // Always keep Y as up vector (camera never rolls)
         let up = Vec3::Y;
@@ -134,7 +195,7 @@ mod tests {
     fn test_cinematic_camera_position_at_t0() {
         let preset = CameraPreset::Cinematic(CameraJourney::default());
         let camera = CameraSystem::new(preset.clone());
-        let (eye, target) = camera.compute_position_and_target(0.0);
+        let (eye, target) = camera.compute_position_and_target(0.0, None::<TerrainFn>);
 
         // At t=0, most sine waves are at 0, cosines at 1
         // Y should be clamped to at least y_min_altitude_m
@@ -157,7 +218,7 @@ mod tests {
 
         // Test various time points
         for t in 0..100 {
-            let (eye, _) = camera.compute_position_and_target(t as f32 * 0.1);
+            let (eye, _) = camera.compute_position_and_target(t as f32 * 0.1, None::<TerrainFn>);
             assert!(
                 eye.y >= params.y_min_altitude_m,
                 "Altitude {} below minimum {} at t={}",
@@ -174,13 +235,13 @@ mod tests {
         let camera = CameraSystem::new(CameraPreset::Basic(params.clone()));
 
         // Test at t=0
-        let (eye0, target0) = camera.compute_position_and_target(0.0);
+        let (eye0, target0) = camera.compute_position_and_target(0.0, None::<TerrainFn>);
         assert_eq!(eye0.x, 0.0); // Centered
         assert_eq!(eye0.y, params.altitude_m); // Constant altitude
         assert_eq!(eye0.z, 0.0); // Starting position
 
         // Test at t=1
-        let (eye1, target1) = camera.compute_position_and_target(1.0);
+        let (eye1, target1) = camera.compute_position_and_target(1.0, None::<TerrainFn>);
         assert_eq!(eye1.x, 0.0); // Still centered
         assert_eq!(eye1.y, params.altitude_m); // Still same altitude
         assert_eq!(eye1.z, params.forward_speed_m_per_s); // Moved forward
@@ -195,7 +256,8 @@ mod tests {
         let camera = CameraSystem::new(CameraPreset::default());
         let render_config = RenderConfig::default();
 
-        let (view_proj, eye_pos) = camera.create_view_proj_matrix(0.0, &render_config);
+        let (view_proj, eye_pos) =
+            camera.create_view_proj_matrix(0.0, &render_config, None::<TerrainFn>);
 
         // Matrix should not be identity or zero
         assert_ne!(view_proj, Mat4::IDENTITY);

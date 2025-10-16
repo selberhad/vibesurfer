@@ -2,7 +2,9 @@
 
 use clap::Parser;
 
-use crate::params::{BasicCameraPath, CameraJourney, CameraPreset, FixedCamera, RecordingConfig};
+use crate::params::{
+    BasicCameraPath, CameraJourney, CameraPreset, FixedCamera, FloatingCamera, RecordingConfig,
+};
 
 /// Command line arguments
 #[derive(Parser, Debug)]
@@ -13,13 +15,17 @@ pub struct Args {
     #[arg(long, value_name = "SECONDS")]
     pub record: Option<f32>,
 
-    /// Camera preset: fixed (default), basic, cinematic
+    /// Camera preset: fixed (default), basic, cinematic, floating
     #[arg(long, value_name = "PRESET", default_value = "fixed")]
     pub camera_preset: String,
 
     /// Camera elevation for fixed preset (meters above origin)
     #[arg(long, value_name = "METERS", default_value = "101")]
     pub elevation: f32,
+
+    /// Height above terrain for floating preset (meters)
+    #[arg(long, value_name = "METERS", default_value = "20")]
+    pub float_height: f32,
 }
 
 impl Args {
@@ -39,6 +45,12 @@ impl Args {
                 let mut fixed = FixedCamera::default();
                 fixed.position[1] = self.elevation;
                 CameraPreset::Fixed(fixed)
+            }
+            "floating" => {
+                println!("Camera: Floating ({}m above terrain)", self.float_height);
+                let mut floating = FloatingCamera::default();
+                floating.height_above_terrain_m = self.float_height;
+                CameraPreset::Floating(floating)
             }
             other => {
                 eprintln!("Warning: Unknown camera preset '{}', using fixed", other);

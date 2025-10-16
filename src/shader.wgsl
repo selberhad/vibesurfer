@@ -58,10 +58,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     color = color * brightness;
 
-    // Distance-based fade to create circular ocean view
+    // Distance-based fade to create circular ocean view AND hide wrap boundary
     let dist_from_center = length(in.world_pos.xz);
-    let fade_start = 400.0;
-    let fade_end = 640.0;
+    let fade_start = 800.0;  // Start fading farther out (1024×1024 grid)
+    let fade_end = 1000.0;   // Complete fade before wrap boundary (1024m)
     let distance_fade = 1.0 - smoothstep(fade_start, fade_end, dist_from_center);
 
     // Output with translucency and distance fade

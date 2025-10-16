@@ -1,6 +1,6 @@
 # Lines of Code Report
 
-**Last Updated**: 2025-10-16 17:27
+**Last Updated**: 2025-10-16 19:01
 **Tool**: [cloc](https://github.com/AlDanial/cloc) + wc
 
 ---
@@ -9,13 +9,13 @@
 
 | Metric | Rust Code | Documentation (.md) | Total |
 |--------|-----------|---------------------|-------|
-| **Lines** | 1,461 | 2,231 | 3,692 |
-| **Comments** | 357 | - | 357 |
-| **Blank Lines** | 332 | - | 332 |
-| **Total Lines** | 2,150 | 2,231 | 4,381 |
+| **Lines** | 1,540 | 2,346 | 3,886 |
+| **Comments** | 379 | - | 379 |
+| **Blank Lines** | 348 | - | 348 |
+| **Total Lines** | 2,267 | 2,346 | 4,613 |
 | **Files** | 17 | 10 | 27 |
 
-**Documentation Ratio**: 1.53 lines of docs per line of code
+**Documentation Ratio**: 1.52 lines of docs per line of code
 
 ---
 
@@ -24,10 +24,10 @@
 ```
 Language                     files          blank        comment           code
 -------------------------------------------------------------------------------
-Rust                            17            332            357           1461
+Rust                            17            348            379           1540
 WGSL                             2             36             19            125
 -------------------------------------------------------------------------------
-SUM:                            19            368            376           1586
+SUM:                            19            384            398           1665
 -------------------------------------------------------------------------------
 ```
 
@@ -41,15 +41,15 @@ SUM:                            19            368            376           1586
 | `audio/mod.rs` | 11 | 11 | 0 | 0.0% | ✅ |
 | `audio/synthesis.rs` | 12 | 12 | 0 | 0.0% | ✅ |
 | `audio/system.rs` | 186 | 150 | 36 | 19.4% | ✅ |
-| `camera.rs` | 209 | 128 | 81 | 38.8% | ✅ |
-| `cli.rs` | 63 | 63 | 0 | 0.0% | ✅ |
+| `camera.rs` | 271 | 189 | 82 | 30.3% | ✅ |
+| `cli.rs` | 75 | 75 | 0 | 0.0% | ✅ |
 | `lib.rs` | 8 | 8 | 0 | 0.0% | ✅ |
-| `main.rs` | 251 | 251 | 0 | 0.0% | ⚠️ Large |
-| `ocean/mesh.rs` | 222 | 222 | 0 | 0.0% | ⚠️ Large |
+| `main.rs` | 255 | 255 | 0 | 0.0% | ⚠️ Large |
+| `ocean/mesh.rs` | 231 | 231 | 0 | 0.0% | ⚠️ Large |
 | `ocean/mod.rs` | 34 | 17 | 17 | 50.0% | ✅ |
 | `ocean/system.rs` | 91 | 67 | 24 | 26.4% | ✅ |
 | `params/audio.rs` | 87 | 87 | 0 | 0.0% | ✅ |
-| `params/camera.rs` | 203 | 203 | 0 | 0.0% | ⚠️ Large |
+| `params/camera.rs` | 233 | 233 | 0 | 0.0% | ⚠️ Large |
 | `params/mod.rs` | 17 | 17 | 0 | 0.0% | ✅ |
 | `params/ocean.rs` | 84 | 84 | 0 | 0.0% | ✅ |
 | `params/render.rs` | 79 | 79 | 0 | 0.0% | ✅ |
@@ -65,12 +65,12 @@ SUM:                            19            368            376           1586
 |------|-------|
 | `ARCHITECTURE.md` | 353 |
 | `CLAUDE.md` | 480 |
-| `CODE_MAP.md` | 605 |
+| `CODE_MAP.md` | 719 |
 | `COVERAGE_REPORT.md` | 68 |
 | `FLOWFIELD.md` | 97 |
 | `LEARNINGS.md` | 272 |
 | `LEXICON.md` | 84 |
-| `LOC_REPORT.md` | 98 |
+| `LOC_REPORT.md` | 99 |
 | `README.md` | 124 |
 | `VISION.md` | 50 |
 
@@ -80,7 +80,7 @@ SUM:                            19            368            376           1586
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| Docs/Code Ratio | ≥0.3 | 1.53 | ✅ Excellent |
+| Docs/Code Ratio | ≥0.3 | 1.52 | ✅ Excellent |
 | README exists | Yes | ✅ | Met |
 | ARCHITECTURE.md | Optional | ✅ | Optional |
 

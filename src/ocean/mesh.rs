@@ -27,6 +27,8 @@ pub struct OceanGrid {
     last_camera_pos: Vec3,
     /// Base terrain heights (stable physics surface, not affected by audio)
     base_terrain_heights: Vec<f32>,
+    /// Track which vertices have been wrapped (need base terrain recompute)
+    dirty_base_terrain: Vec<bool>,
 }
 
 impl OceanGrid {
@@ -83,6 +85,7 @@ impl OceanGrid {
             grid_spacing: physics.grid_spacing_m,
             last_camera_pos: Vec3::ZERO,
             base_terrain_heights: vec![0.0; vertex_count],
+            dirty_base_terrain: vec![true; vertex_count], // Initially all need computation
         }
     }
 
@@ -142,33 +145,39 @@ impl OceanGrid {
             vertex.position[0] -= camera_delta.x;
             vertex.position[2] -= camera_delta.z;
 
-            // Toroidal wrapping: if vertex exits behind camera, wrap to front
-            // Wrap in Z (forward/backward)
-            if vertex.position[2] < -half_size {
-                vertex.position[2] += grid_world_size;
-            } else if vertex.position[2] > half_size {
-                vertex.position[2] -= grid_world_size;
-            }
+            // Toroidal wrapping using modulo (branchless, better for SIMD/pipelining)
+            // Map to [0, grid_world_size) range, then shift to [-half_size, half_size)
+            let wrapped_x =
+                ((vertex.position[0] + half_size).rem_euclid(grid_world_size)) - half_size;
+            let wrapped_z =
+                ((vertex.position[2] + half_size).rem_euclid(grid_world_size)) - half_size;
 
-            // Wrap in X (left/right)
-            if vertex.position[0] < -half_size {
-                vertex.position[0] += grid_world_size;
-            } else if vertex.position[0] > half_size {
-                vertex.position[0] -= grid_world_size;
-            }
+            let wrapped = (wrapped_x - vertex.position[0]).abs() > 0.01
+                || (wrapped_z - vertex.position[2]).abs() > 0.01;
+
+            vertex.position[0] = wrapped_x;
+            vertex.position[2] = wrapped_z;
 
             // Get absolute world coordinates
             let x_world = camera_pos.x + vertex.position[0];
             let z_world = camera_pos.z + vertex.position[2];
 
             // Layer 1: Base terrain (stable, time-independent hills)
-            let base_noise = self.perlin.get([
-                (x_world * physics.base_terrain_frequency) as f64,
-                (z_world * physics.base_terrain_frequency) as f64,
-                0.0, // Time-independent for stable terrain
-            ]) as f32;
-            let base_height = base_noise * physics.base_terrain_amplitude_m;
-            self.base_terrain_heights[idx] = base_height;
+            // Only recompute if this vertex was just wrapped (changed position)
+            let base_height = if wrapped || self.dirty_base_terrain[idx] {
+                let base_noise = self.perlin.get([
+                    (x_world * physics.base_terrain_frequency) as f64,
+                    (z_world * physics.base_terrain_frequency) as f64,
+                    0.0, // Time-independent for stable terrain
+                ]) as f32;
+                let h = base_noise * physics.base_terrain_amplitude_m;
+                self.base_terrain_heights[idx] = h;
+                self.dirty_base_terrain[idx] = false;
+                h
+            } else {
+                // Use cached base height
+                self.base_terrain_heights[idx]
+            };
 
             // Layer 2: Detail (audio-reactive, animated)
             let detail_noise = self.perlin.get([

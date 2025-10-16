@@ -180,10 +180,14 @@ impl App {
         // Get audio frequency bands
         let audio_bands = audio.get_bands();
 
+        // Create terrain query function for floating camera
+        let ocean_physics = self.ocean.physics.clone();
+        let terrain_fn = |x: f32, z: f32| self.ocean.grid.query_base_terrain(x, z, &ocean_physics);
+
         // Update camera position
-        let (view_proj, camera_pos) = self
-            .camera
-            .create_view_proj_matrix(time_s, &self.render_config);
+        let (view_proj, camera_pos) =
+            self.camera
+                .create_view_proj_matrix(time_s, &self.render_config, Some(terrain_fn));
 
         // For fixed camera, use simulated velocity to flow grid
         let effective_camera_pos = if let Some(sim_vel) = self.camera.get_simulated_velocity() {
