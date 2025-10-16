@@ -2,7 +2,7 @@
 
 ## Concept: The Sound–Surface Feedback Loop
 
-Skiwave’s ocean is not simulated water — it’s a living waveform.  
+Vibesurfer's ocean is not simulated water — it's a living waveform.  
 Every crest, trough, and shimmer is directly derived from the procedural music engine.  
 The world *is* the soundtrack, and the soundtrack *is* the world.
 

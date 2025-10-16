@@ -1,4 +1,4 @@
-//! Skiwave - A fluid, retro-futuristic jet-surfing simulator
+//! Vibesurfer - A fluid, retro-futuristic jet-surfing simulator
 //!
 //! The surface behaves like living music: waves pulse to the beat,
 //! currents shimmer with color, and your motion becomes rhythm.
@@ -29,7 +29,7 @@ use rendering::{RenderSystem, SkyboxUniforms, Uniforms};
 
 /// Command line arguments
 #[derive(Parser, Debug)]
-#[command(name = "Skiwave")]
+#[command(name = "Vibesurfer")]
 #[command(about = "Audio-reactive ocean surfing simulator", long_about = None)]
 struct Args {
     /// Record gameplay to video (duration in seconds)
@@ -108,7 +108,7 @@ impl ApplicationHandler for App {
 
         // Create window
         let window_attributes = Window::default_attributes()
-            .with_title("Skiwave - Audio-Reactive Ocean")
+            .with_title("Vibesurfer - Audio-Reactive Ocean")
             .with_inner_size(winit::dpi::LogicalSize::new(
                 self.render_config.window_width,
                 self.render_config.window_height,
@@ -134,7 +134,7 @@ impl ApplicationHandler for App {
             println!("   Output: {}/", cfg.output_dir);
             println!("   Frames: {} @ {}fps", cfg.total_frames(), cfg.fps);
         } else {
-            println!("\nSkiwave is running!");
+            println!("\nVibesurfer is running!");
             println!("Press ESC to quit\n");
         }
 
@@ -254,7 +254,7 @@ fn main() {
     // Parse command line arguments
     let args = Args::parse();
 
-    println!("Skiwave - Fluid audio-reactive ocean surfing simulator");
+    println!("Vibesurfer - Fluid audio-reactive ocean surfing simulator");
     println!("Initializing systems...\n");
 
     // Parse camera preset

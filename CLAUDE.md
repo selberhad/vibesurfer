@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Skiwave** - A fluid, retro-futuristic jet-surfing simulator where you glide, dive, and carve across an endless neon ocean. The surface behaves like living music: waves pulse to the beat, currents shimmer with color, and your motion becomes rhythm.
+**Vibesurfer** - A fluid, retro-futuristic jet-surfing simulator where you glide, dive, and carve across an endless neon ocean. The surface behaves like living music: waves pulse to the beat, currents shimmer with color, and your motion becomes rhythm.
 
 **Philosophy**: Artifacts are disposable, clarity is durable. Code can be rewritten, insights cannot. Generation is cheap, understanding is valuable.
 
@@ -302,9 +302,9 @@ _Toys validate complex patterns and techniques before integrating into productio
 - Property tests for procedural generation (same seed → same output)
 
 **Module Architecture**:
-- `skiwave-core`: Platform-agnostic game logic (ECS, flow system, game state)
-- `skiwave-native`: Native rendering, audio, input (wgpu, cpal, winit)
-- `skiwave-web`: WebGPU/WebAudio bindings (same core logic)
+- `vibesurfer-core`: Platform-agnostic game logic (ECS, flow system, game state)
+- `vibesurfer-native`: Native rendering, audio, input (wgpu, cpal, winit)
+- `vibesurfer-web`: WebGPU/WebAudio bindings (same core logic)
 
 ## Architecture Principles
 
@@ -428,7 +428,7 @@ Your mandate is not to produce maximal code, but to produce maximal clarity with
 - Artifacts are disposable; clarity is durable
 - Comprehensive generation enables focused simplification
 
-**Skiwave-specific focus:**
+**Vibesurfer-specific focus:**
 - Procedural generation quality (noise coherence, FFT synthesis)
 - Audio-visual synchronization (music drives terrain, motion modulates sound)
 - Performance targets (60 FPS, <16ms frame budget)

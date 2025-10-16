@@ -1,4 +1,4 @@
-//! Skiwave library - Audio-reactive ocean simulation
+//! Vibesurfer library - Audio-reactive ocean simulation
 
 pub mod audio;
 pub mod camera;

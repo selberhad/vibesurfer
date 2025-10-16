@@ -1,6 +1,6 @@
 # VISION.md
 
-## Project: Skiwave
+## Project: Vibesurfer
 
 ### Core Idea
 A fluid, retro-futuristic jet-surfing simulator — glide, dive, and carve across an endless neon ocean.  
@@ -34,9 +34,9 @@ Every run should feel like surfing through sound and light — half game, half i
 
 ### Architecture Intent
 - Modular workspace:
-  - `skiwave-core`: deterministic logic, ECS, flow systems.
-  - `skiwave-native`: full 3D, advanced shaders, real-time synth.
-  - `skiwave-web`: simplified WebGPU version, same logic.
+  - `vibesurfer-core`: deterministic logic, ECS, flow systems.
+  - `vibesurfer-native`: full 3D, advanced shaders, real-time synth.
+  - `vibesurfer-web`: simplified WebGPU version, same logic.
 - Procedural surfaces built from harmonic noise fields and signed-distance deformation.
 - Audio and physics unified through shared waveform parameters (“the sea is the sound”).
 
@@ -48,4 +48,4 @@ Every run should feel like surfing through sound and light — half game, half i
 - Nothing pre-rendered; every run unique.
 
 ### Tagline
-> *Skiwave — surf the sound.*
+> *Vibesurfer — surf the sound.*

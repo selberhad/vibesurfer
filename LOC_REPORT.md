@@ -1,6 +1,6 @@
 # Lines of Code Report
 
-**Last Updated**: 2025-10-16 16:56
+**Last Updated**: 2025-10-16 17:02
 **Tool**: [cloc](https://github.com/AlDanial/cloc) + wc
 
 ---
@@ -9,13 +9,13 @@
 
 | Metric | Rust Code | Documentation (.md) | Total |
 |--------|-----------|---------------------|-------|
-| **Lines** | 1,412 | 1,095 | 2,507 |
+| **Lines** | 1,412 | 1,094 | 2,506 |
 | **Comments** | 344 | - | 344 |
 | **Blank Lines** | 318 | - | 318 |
-| **Total Lines** | 2,074 | 1,095 | 3,169 |
+| **Total Lines** | 2,074 | 1,094 | 3,168 |
 | **Files** | 7 | 7 | 14 |
 
-**Documentation Ratio**: 0.78 lines of docs per line of code
+**Documentation Ratio**: 0.77 lines of docs per line of code
 
 ---
 
@@ -58,7 +58,7 @@ SUM:                             9            354            363           1537
 | `FLOWFIELD.md` | 97 |
 | `LEARNINGS.md` | 272 |
 | `LEXICON.md` | 84 |
-| `LOC_REPORT.md` | 87 |
+| `LOC_REPORT.md` | 86 |
 | `VISION.md` | 50 |
 
 ---
@@ -67,7 +67,7 @@ SUM:                             9            354            363           1537
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| Docs/Code Ratio | ≥0.3 | 0.78 | ✅ Excellent |
+| Docs/Code Ratio | ≥0.3 | 0.77 | ✅ Excellent |
 | README exists | Yes | ❌ | Missing |
 | ARCHITECTURE.md | Optional | ❌ | Optional |
 
