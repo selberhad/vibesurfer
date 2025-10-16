@@ -36,8 +36,8 @@ struct Args {
     #[arg(long, value_name = "SECONDS")]
     record: Option<f32>,
 
-    /// Camera preset: basic (default), cinematic
-    #[arg(long, value_name = "PRESET", default_value = "basic")]
+    /// Camera preset: fixed (default), basic, cinematic
+    #[arg(long, value_name = "PRESET", default_value = "fixed")]
     camera_preset: String,
 }
 
@@ -197,9 +197,17 @@ impl App {
             .camera
             .create_view_proj_matrix(time_s, &self.render_config);
 
+        // For fixed camera, use simulated velocity to flow grid
+        let effective_camera_pos = if let Some(sim_vel) = self.camera.get_simulated_velocity() {
+            camera_pos + sim_vel * time_s
+        } else {
+            camera_pos
+        };
+
         // Update ocean simulation (returns modulated parameters)
         let (amplitude, frequency, line_width) =
-            self.ocean.update(time_s, &audio_bands, camera_pos);
+            self.ocean
+                .update(time_s, &audio_bands, effective_camera_pos);
 
         // Grid stays at origin - camera flies over it (no tiling, just huge grid)
         let model = Mat4::IDENTITY;
@@ -253,12 +261,13 @@ fn main() {
             println!("Camera: Cinematic (procedural journey)");
             params::CameraPreset::Cinematic(params::CameraJourney::default())
         }
+        "fixed" => {
+            println!("Camera: Fixed (stationary for debugging)");
+            params::CameraPreset::Fixed(params::FixedCamera::default())
+        }
         other => {
-            eprintln!(
-                "Warning: Unknown camera preset '{}', using cinematic",
-                other
-            );
-            params::CameraPreset::Cinematic(params::CameraJourney::default())
+            eprintln!("Warning: Unknown camera preset '{}', using fixed", other);
+            params::CameraPreset::Fixed(params::FixedCamera::default())
         }
     };
 

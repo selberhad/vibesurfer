@@ -183,6 +183,29 @@ impl Default for BasicCameraPath {
     }
 }
 
+/// Fixed camera position (for debugging)
+#[derive(Debug, Clone)]
+pub struct FixedCamera {
+    /// Camera position (meters)
+    pub position: [f32; 3],
+
+    /// Look-at target (meters)
+    pub target: [f32; 3],
+
+    /// Simulated forward velocity (m/s) to flow the grid
+    pub simulated_velocity: f32,
+}
+
+impl Default for FixedCamera {
+    fn default() -> Self {
+        Self {
+            position: [0.0, 30.0, 0.0], // 30m above origin
+            target: [0.0, 0.0, 100.0],  // Looking forward and down
+            simulated_velocity: 150.0,  // Same as basic preset
+        }
+    }
+}
+
 /// Camera preset selection
 #[derive(Debug, Clone)]
 pub enum CameraPreset {
@@ -191,11 +214,14 @@ pub enum CameraPreset {
 
     /// Basic preset: straight-line flight at constant altitude, looking forward
     Basic(BasicCameraPath),
+
+    /// Fixed preset: stationary camera for debugging
+    Fixed(FixedCamera),
 }
 
 impl Default for CameraPreset {
     fn default() -> Self {
-        Self::Basic(BasicCameraPath::default())
+        Self::Fixed(FixedCamera::default())
     }
 }
 

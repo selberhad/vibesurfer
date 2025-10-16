@@ -2,7 +2,7 @@
 
 use glam::{Mat4, Vec3};
 
-use crate::params::{BasicCameraPath, CameraJourney, CameraPreset, RenderConfig};
+use crate::params::{BasicCameraPath, CameraJourney, CameraPreset, FixedCamera, RenderConfig};
 
 /// Camera system with procedural journey path
 pub struct CameraSystem {
@@ -26,6 +26,25 @@ impl CameraSystem {
         match &self.preset {
             CameraPreset::Cinematic(params) => Self::compute_cinematic_path(params, time_s),
             CameraPreset::Basic(params) => Self::compute_basic_path(params, time_s),
+            CameraPreset::Fixed(params) => Self::compute_fixed_path(params),
+        }
+    }
+
+    /// Compute fixed camera path (stationary view, simulated motion for grid flow)
+    fn compute_fixed_path(p: &FixedCamera) -> (Vec3, Vec3) {
+        let eye = Vec3::from_array(p.position);
+        let target = Vec3::from_array(p.target);
+        (eye, target)
+    }
+
+    /// Get simulated velocity for fixed camera (used to flow grid)
+    pub fn get_simulated_velocity(&self) -> Option<Vec3> {
+        match &self.preset {
+            CameraPreset::Fixed(params) => {
+                // Flow grid forward (positive Z direction)
+                Some(Vec3::new(0.0, 0.0, params.simulated_velocity))
+            }
+            _ => None,
         }
     }
 

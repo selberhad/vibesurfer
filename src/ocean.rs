@@ -29,6 +29,8 @@ pub struct OceanGrid {
     perlin: Perlin,
     grid_size: usize,
     grid_spacing: f32,
+    /// Last camera position (for computing delta movement)
+    last_camera_pos: Vec3,
 }
 
 impl OceanGrid {
@@ -79,21 +81,20 @@ impl OceanGrid {
             perlin: Perlin::new(physics.noise_seed),
             grid_size: physics.grid_size,
             grid_spacing: physics.grid_spacing_m,
+            last_camera_pos: Vec3::ZERO,
         }
     }
 
-    /// Get total size of the grid in world units (for modulo wrapping)
-    pub fn total_size(&self) -> f32 {
-        self.grid_size as f32 * self.grid_spacing
-    }
-
     /// Update ocean surface with Perlin noise animation
+    ///
+    /// Uses a flowing surface approach: grid vertices scroll backward as camera "moves" forward,
+    /// with toroidal wrapping to create infinite extent illusion.
     ///
     /// # Arguments
     /// * `time_s` - Current time in seconds
     /// * `amplitude_m` - Wave height in meters
     /// * `frequency` - Spatial frequency (cycles per meter)
-    /// * `camera_pos` - Camera position (for infinite ocean illusion)
+    /// * `camera_pos` - Camera position (used to compute flow velocity)
     /// * `physics` - Ocean physics parameters
     pub fn update(
         &mut self,
@@ -105,26 +106,47 @@ impl OceanGrid {
     ) {
         let t = time_s * physics.wave_speed;
 
-        // Tile size for seamless wrapping
-        let tile_size = self.grid_size as f32 * self.grid_spacing;
+        // Compute camera delta (how much camera moved this frame)
+        let camera_delta = camera_pos - self.last_camera_pos;
+        self.last_camera_pos = camera_pos;
 
+        // Grid dimensions for wrapping
+        let grid_world_size = self.grid_size as f32 * self.grid_spacing;
+        let half_size = grid_world_size / 2.0;
+
+        // Flow grid backward opposite to camera motion
+        // (Camera moves forward → grid flows backward)
         for vertex in &mut self.vertices {
-            // Local grid coordinates
-            let x_local = vertex.position[0];
-            let z_local = vertex.position[2];
+            // Move vertex opposite to camera motion
+            vertex.position[0] -= camera_delta.x;
+            vertex.position[2] -= camera_delta.z;
 
-            // World coordinates with modulo tiling for infinite ocean
-            let x_world = (x_local + camera_pos.x) % tile_size;
-            let z_world = (z_local + camera_pos.z) % tile_size;
+            // Toroidal wrapping: if vertex exits behind camera, wrap to front
+            // Wrap in Z (forward/backward)
+            if vertex.position[2] < -half_size {
+                vertex.position[2] += grid_world_size;
+            } else if vertex.position[2] > half_size {
+                vertex.position[2] -= grid_world_size;
+            }
 
-            // Sample 3D Perlin noise (x, z, time)
+            // Wrap in X (left/right)
+            if vertex.position[0] < -half_size {
+                vertex.position[0] += grid_world_size;
+            } else if vertex.position[0] > half_size {
+                vertex.position[0] -= grid_world_size;
+            }
+
+            // Sample wave height at absolute world coordinate
+            // Use camera_pos + vertex_pos to get true world coordinate
+            let x_world = camera_pos.x + vertex.position[0];
+            let z_world = camera_pos.z + vertex.position[2];
+
             let noise_value = self.perlin.get([
                 (x_world * frequency) as f64,
                 (z_world * frequency) as f64,
                 t as f64,
             ]) as f32;
 
-            // Set Y position (wave height)
             vertex.position[1] = noise_value * amplitude_m;
         }
     }
