@@ -447,9 +447,24 @@ Apply before coding and before PR:
 - **Benchmark-Driven**: If performance matters, measure it (don't guess)
 - **Time-Boxed**: Propose what you could build in 30-60 minutes today
 
-## Innovation Patterns from Practice
+## HANDOFF.md Protocol
 
-**Agent-to-Agent Handoff**: At major milestones, write handoff notes for next session (what worked, what didn't, decisions made, next steps)
+**CRITICAL: Only update at END OF SESSION**
+
+**Purpose**: Session-to-session continuity. Gitignored ephemeral file.
+
+**At session start:**
+- Read `HANDOFF.md` if exists
+- **Delete after reading**: `rm HANDOFF.md` (force explicit handoff, prevent drift)
+
+**At session end:**
+- Write fresh `HANDOFF.md` (old already deleted)
+- Include: Status, learnings, next action, key files
+- **NO CODE WORK AFTER WRITING** - signals session end
+- Only housekeeping: docs updates, commits
+- **NEVER commit HANDOFF.md**
+
+## Innovation Patterns from Practice
 
 **Test-Driven Infrastructure**: Build scripts and tools are testable too (validate outputs, exit codes, file generation)
 
