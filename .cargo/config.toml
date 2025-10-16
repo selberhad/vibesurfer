@@ -1,0 +1,20 @@
+# Cargo build configuration for faster iteration
+
+[build]
+# Use all available CPU cores
+jobs = 8
+
+[target.aarch64-apple-darwin]
+# Use native macOS linker with optimizations
+# Faster linking by removing unused symbols
+rustflags = ["-C", "link-arg=-Wl,-dead_strip"]
+
+[profile.dev]
+# Faster incremental builds
+incremental = true
+
+# Faster debug builds (less optimized but faster to compile)
+opt-level = 0
+
+# Minimal debug info (faster linking, still usable for debugging)
+debug = 1

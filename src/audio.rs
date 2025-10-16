@@ -106,15 +106,24 @@ impl AudioSystem {
                     let mut engine = engine_clone.lock().unwrap();
                     let mut fft_buf = fft_buffer_clone.lock().unwrap();
 
-                    let (buffers, _) = engine.next_block(vec![]);
+                    let frames_needed = data.len() / 2; // Stereo frames
+                    let mut frame_idx = 0;
 
-                    for (i, frame) in data.chunks_mut(2).enumerate() {
-                        if i < BLOCK_SIZE {
+                    // Generate multiple blocks if needed to fill the entire buffer
+                    while frame_idx < frames_needed {
+                        let (buffers, _) = engine.next_block(vec![]);
+
+                        let samples_to_copy = (frames_needed - frame_idx).min(BLOCK_SIZE);
+
+                        for i in 0..samples_to_copy {
                             // Safety limiter: hard clip to ±0.5 to prevent ear damage
                             let left = buffers[0][i].clamp(-0.5, 0.5);
                             let right = buffers[1][i].clamp(-0.5, 0.5);
-                            frame[0] = left;
-                            frame[1] = right;
+
+                            let out_idx = (frame_idx + i) * 2;
+                            data[out_idx] = left;
+                            data[out_idx + 1] = right;
+
                             fft_buf.push(left); // Accumulate for FFT analysis
 
                             // Record to WAV if recording
@@ -124,10 +133,9 @@ impl AudioSystem {
                                     let _ = w.write_sample(right);
                                 }
                             }
-                        } else {
-                            frame[0] = 0.0;
-                            frame[1] = 0.0;
                         }
+
+                        frame_idx += samples_to_copy;
                     }
                 },
                 |err| eprintln!("Audio stream error: {}", err),

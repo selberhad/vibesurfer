@@ -1,6 +1,6 @@
 # Lines of Code Report
 
-**Last Updated**: 2025-10-16 05:43
+**Last Updated**: 2025-10-16 05:54
 **Tool**: [cloc](https://github.com/AlDanial/cloc) + wc
 
 ---
@@ -9,13 +9,13 @@
 
 | Metric | Rust Code | Documentation (.md) | Total |
 |--------|-----------|---------------------|-------|
-| **Lines** | 1,292 | 1,428 | 2,720 |
-| **Comments** | 298 | - | 298 |
-| **Blank Lines** | 282 | - | 282 |
-| **Total Lines** | 1,872 | 1,428 | 3,300 |
+| **Lines** | 1,294 | 1,428 | 2,722 |
+| **Comments** | 299 | - | 299 |
+| **Blank Lines** | 287 | - | 287 |
+| **Total Lines** | 1,880 | 1,428 | 3,308 |
 | **Files** | 7 | 8 | 15 |
 
-**Documentation Ratio**: 1.11 lines of docs per line of code
+**Documentation Ratio**: 1.10 lines of docs per line of code
 
 ---
 
@@ -24,10 +24,10 @@
 ```
 Language                     files          blank        comment           code
 -------------------------------------------------------------------------------
-Rust                             7            282            298           1292
+Rust                             7            287            299           1294
 WGSL                             2             36             19            125
 -------------------------------------------------------------------------------
-SUM:                             9            318            317           1417
+SUM:                             9            323            318           1419
 -------------------------------------------------------------------------------
 ```
 
@@ -37,7 +37,7 @@ SUM:                             9            318            317           1417
 
 | File | Total Lines | Impl Lines | Test Lines | Test % | Status |
 |------|-------------|------------|------------|--------|--------|
-| `audio.rs` | 269 | 223 | 46 | 17.1% | ⚠️ Large |
+| `audio.rs` | 277 | 231 | 46 | 16.6% | ⚠️ Large |
 | `camera.rs` | 190 | 109 | 81 | 42.6% | ✅ |
 | `lib.rs` | 7 | 7 | 0 | 0.0% | ✅ |
 | `main.rs` | 279 | 279 | 0 | 0.0% | ⚠️ Large |
@@ -68,7 +68,7 @@ SUM:                             9            318            317           1417
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| Docs/Code Ratio | ≥0.3 | 1.11 | ✅ Excellent |
+| Docs/Code Ratio | ≥0.3 | 1.10 | ✅ Excellent |
 | README exists | Yes | ❌ | Missing |
 | ARCHITECTURE.md | Optional | ❌ | Optional |
 
