@@ -50,6 +50,49 @@ This project follows **Dialectic-Driven Development (DDD)** - a learning-driven 
 
 **Domain language over implementation details** - Speak what it means, not how it works. `flow_tracker.update()` not `sigmoid_smoothness_calc()`.
 
+## Recording Gameplay Videos
+
+**Process**: Vibesurfer includes a built-in recording system that captures synchronized video frames and audio.
+
+**Steps**:
+1. **Clean previous recording** (if needed):
+   ```bash
+   rm -rf recording/frames/* recording/audio.wav recording/output.mp4
+   ```
+
+2. **Capture recording** (builds and runs with recording mode):
+   ```bash
+   cargo run --release -- --record 10  # 10 seconds
+   ```
+   - Captures 60fps PNG frames to `recording/frames/`
+   - Captures synchronized audio to `recording/audio.wav`
+   - Application exits automatically when recording completes
+
+3. **Combine into video**:
+   ```bash
+   ./scripts/combine-recording.sh
+   ```
+   - Uses ffmpeg to merge frames + audio
+   - Outputs `recording/output.mp4` (H.264, 60fps, AAC audio)
+   - Displays file size and viewing command
+
+4. **View result**:
+   ```bash
+   open recording/output.mp4
+   ```
+
+**Performance notes**:
+- Use `--release` build for smooth 60fps capture
+- Recording adds ~1ms overhead per frame (staging buffer copy)
+- Typical output: ~2.5MB per second of video
+
+**Camera options** (combine with `--record`):
+```bash
+cargo run --release -- --record 10 --camera-preset cinematic
+cargo run --release -- --record 10 --camera-preset basic
+cargo run --release -- --record 10 --camera-preset fixed --elevation 80
+```
+
 ## Development Best Practices
 
 **CRITICAL: Full Autonomy Required**
