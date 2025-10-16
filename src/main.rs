@@ -36,8 +36,8 @@ struct Args {
     #[arg(long, value_name = "SECONDS")]
     record: Option<f32>,
 
-    /// Camera preset: cinematic (default), basic
-    #[arg(long, value_name = "PRESET", default_value = "cinematic")]
+    /// Camera preset: basic (default), cinematic
+    #[arg(long, value_name = "PRESET", default_value = "basic")]
     camera_preset: String,
 }
 
@@ -201,7 +201,7 @@ impl App {
         let (amplitude, frequency, line_width) =
             self.ocean.update(time_s, &audio_bands, camera_pos);
 
-        // Ocean grid stays at world origin - camera moves relative to it
+        // Grid stays at origin - camera flies over it (no tiling, just huge grid)
         let model = Mat4::IDENTITY;
         let mvp = view_proj * model;
 

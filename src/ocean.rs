@@ -27,6 +27,8 @@ pub struct OceanGrid {
     pub vertices: Vec<Vertex>,
     pub indices: Vec<u32>,
     perlin: Perlin,
+    grid_size: usize,
+    grid_spacing: f32,
 }
 
 impl OceanGrid {
@@ -75,7 +77,14 @@ impl OceanGrid {
             vertices,
             indices,
             perlin: Perlin::new(physics.noise_seed),
+            grid_size: physics.grid_size,
+            grid_spacing: physics.grid_spacing_m,
         }
+    }
+
+    /// Get total size of the grid in world units (for modulo wrapping)
+    pub fn total_size(&self) -> f32 {
+        self.grid_size as f32 * self.grid_spacing
     }
 
     /// Update ocean surface with Perlin noise animation
@@ -96,14 +105,17 @@ impl OceanGrid {
     ) {
         let t = time_s * physics.wave_speed;
 
+        // Tile size for seamless wrapping
+        let tile_size = self.grid_size as f32 * self.grid_spacing;
+
         for vertex in &mut self.vertices {
             // Local grid coordinates
             let x_local = vertex.position[0];
             let z_local = vertex.position[2];
 
-            // World coordinates - offset by camera XZ to create infinite ocean illusion
-            let x_world = x_local + camera_pos.x;
-            let z_world = z_local + camera_pos.z;
+            // World coordinates with modulo tiling for infinite ocean
+            let x_world = (x_local + camera_pos.x) % tile_size;
+            let z_world = (z_local + camera_pos.z) % tile_size;
 
             // Sample 3D Perlin noise (x, z, time)
             let noise_value = self.perlin.get([

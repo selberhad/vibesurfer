@@ -41,8 +41,8 @@ pub struct OceanPhysics {
 impl Default for OceanPhysics {
     fn default() -> Self {
         Self {
-            grid_size: 128,
-            grid_spacing_m: 10.0,
+            grid_size: 512,      // Large enough for good view distance without lag
+            grid_spacing_m: 2.0, // Fine spacing for many lines
             wave_speed: 0.5,
             base_amplitude_m: 2.0,
             base_frequency: 0.1,
@@ -176,9 +176,9 @@ pub struct BasicCameraPath {
 impl Default for BasicCameraPath {
     fn default() -> Self {
         Self {
-            altitude_m: 50.0,
-            forward_speed_m_per_s: 8.0,
-            look_ahead_m: 100.0,
+            altitude_m: 30.0,             // Moderate altitude
+            forward_speed_m_per_s: 150.0, // Fast speed
+            look_ahead_m: 150.0,
         }
     }
 }
@@ -195,7 +195,7 @@ pub enum CameraPreset {
 
 impl Default for CameraPreset {
     fn default() -> Self {
-        Self::Cinematic(CameraJourney::default())
+        Self::Basic(BasicCameraPath::default())
     }
 }
 
@@ -346,7 +346,7 @@ pub struct RenderConfig {
     pub window_height: u32,
 
     /// Field of view (degrees)
-    /// toy2 value: 45.0
+    /// 75° = wide perspective for sense of speed and vastness
     pub fov_degrees: f32,
 
     /// Near clipping plane (meters)
@@ -354,7 +354,7 @@ pub struct RenderConfig {
     pub near_plane_m: f32,
 
     /// Far clipping plane (meters)
-    /// toy2 value: 1000.0
+    /// Extended to 2000m for more visible ocean horizon
     pub far_plane_m: f32,
 }
 
@@ -363,9 +363,9 @@ impl Default for RenderConfig {
         Self {
             window_width: 1280,
             window_height: 720,
-            fov_degrees: 45.0,
+            fov_degrees: 100.0, // Very wide FOV for extreme perspective
             near_plane_m: 0.1,
-            far_plane_m: 1000.0,
+            far_plane_m: 2000.0,
         }
     }
 }
