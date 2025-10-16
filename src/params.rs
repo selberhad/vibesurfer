@@ -14,27 +14,29 @@ pub struct OceanPhysics {
     pub grid_size: usize,
 
     /// Spacing between grid vertices in world units (meters)
-    /// toy2 value: 10.0
     pub grid_spacing_m: f32,
 
     /// Wave animation speed multiplier (dimensionless, affects time scaling)
-    /// toy2 value: 0.5
     pub wave_speed: f32,
 
-    /// Base wave height in meters (before audio modulation)
-    /// toy2 value: 2.0
-    pub base_amplitude_m: f32,
+    // === Base terrain (stable physics surface for skiing) ===
+    /// Base terrain amplitude in meters (large stable hills)
+    pub base_terrain_amplitude_m: f32,
 
-    /// Base spatial frequency (cycles per meter, controls wave detail)
-    /// toy2 value: 0.1
-    pub base_frequency: f32,
+    /// Base terrain frequency (cycles per meter, low = long slopes)
+    pub base_terrain_frequency: f32,
+
+    // === Detail layer (audio-reactive visual ripples) ===
+    /// Detail wave height in meters (before audio modulation)
+    pub detail_amplitude_m: f32,
+
+    /// Detail spatial frequency (cycles per meter, controls wave chop)
+    pub detail_frequency: f32,
 
     /// Base wireframe line width (screen-space or shader units)
-    /// toy2 value: 0.02
     pub base_line_width: f32,
 
     /// Perlin noise seed
-    /// toy2 value: 42
     pub noise_seed: u32,
 }
 
@@ -44,8 +46,15 @@ impl Default for OceanPhysics {
             grid_size: 512,      // Large enough for good view distance without lag
             grid_spacing_m: 2.0, // Fine spacing for many lines
             wave_speed: 0.5,
-            base_amplitude_m: 2.0,
-            base_frequency: 0.1,
+
+            // Base terrain: EXTREME Tribes-style hills for skiing (100m tall, long slopes)
+            base_terrain_amplitude_m: 100.0,
+            base_terrain_frequency: 0.003, // Even longer wavelengths for massive hills
+
+            // Detail layer: audio-reactive chop (2m tall, fine detail)
+            detail_amplitude_m: 2.0,
+            detail_frequency: 0.1,
+
             base_line_width: 0.02,
             noise_seed: 42,
         }
@@ -199,9 +208,9 @@ pub struct FixedCamera {
 impl Default for FixedCamera {
     fn default() -> Self {
         Self {
-            position: [0.0, 30.0, 0.0], // 30m above origin
-            target: [0.0, 0.0, 100.0],  // Looking forward and down
-            simulated_velocity: 150.0,  // Same as basic preset
+            position: [0.0, 101.0, 0.0], // Just above tallest hills (100m amplitude)
+            target: [0.0, 0.0, 100.0],   // Looking forward and down
+            simulated_velocity: 150.0,   // Same as basic preset
         }
     }
 }

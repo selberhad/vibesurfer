@@ -39,6 +39,10 @@ struct Args {
     /// Camera preset: fixed (default), basic, cinematic
     #[arg(long, value_name = "PRESET", default_value = "fixed")]
     camera_preset: String,
+
+    /// Camera elevation for fixed preset (meters above origin)
+    #[arg(long, value_name = "METERS", default_value = "101")]
+    elevation: f32,
 }
 
 /// Main application state
@@ -213,8 +217,9 @@ impl App {
         let model = Mat4::IDENTITY;
         let mvp = view_proj * model;
 
-        // Update ocean vertices
+        // Update ocean vertices and indices (filtered to remove phantom lines)
         render_system.update_vertices(&self.ocean.grid.vertices);
+        render_system.update_indices(&self.ocean.grid.filtered_indices);
 
         // Update ocean uniforms
         let uniforms = Uniforms {
@@ -236,7 +241,8 @@ impl App {
         render_system.update_skybox_uniforms(&skybox_uniforms);
 
         // Render (and capture if recording)
-        if let Err(e) = render_system.render(self.frame_count) {
+        let index_count = self.ocean.grid.filtered_indices.len() as u32;
+        if let Err(e) = render_system.render(self.frame_count, index_count) {
             eprintln!("Render error: {:?}", e);
         }
 
@@ -262,8 +268,10 @@ fn main() {
             params::CameraPreset::Cinematic(params::CameraJourney::default())
         }
         "fixed" => {
-            println!("Camera: Fixed (stationary for debugging)");
-            params::CameraPreset::Fixed(params::FixedCamera::default())
+            println!("Camera: Fixed (elevation: {}m)", args.elevation);
+            let mut fixed = params::FixedCamera::default();
+            fixed.position[1] = args.elevation;
+            params::CameraPreset::Fixed(fixed)
         }
         other => {
             eprintln!("Warning: Unknown camera preset '{}', using fixed", other);

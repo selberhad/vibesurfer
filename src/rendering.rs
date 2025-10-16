@@ -40,7 +40,6 @@ pub struct RenderSystem {
     uniform_bind_group: wgpu::BindGroup,
     skybox_uniform_buffer: wgpu::Buffer,
     skybox_bind_group: wgpu::BindGroup,
-    index_count: u32,
     recording_config: Option<RecordingConfig>,
     window_size: (u32, u32),
 }
@@ -139,7 +138,7 @@ impl RenderSystem {
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Index Buffer"),
             contents: bytemuck::cast_slice(&ocean_grid.indices),
-            usage: wgpu::BufferUsages::INDEX,
+            usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
         });
 
         let uniforms = Uniforms {
@@ -329,7 +328,6 @@ impl RenderSystem {
             uniform_bind_group,
             skybox_uniform_buffer,
             skybox_bind_group,
-            index_count: ocean_grid.indices.len() as u32,
             recording_config,
             window_size,
         })
@@ -339,6 +337,12 @@ impl RenderSystem {
     pub fn update_vertices(&self, vertices: &[Vertex]) {
         self.queue
             .write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(vertices));
+    }
+
+    /// Update ocean index buffer with new index data
+    pub fn update_indices(&self, indices: &[u32]) {
+        self.queue
+            .write_buffer(&self.index_buffer, 0, bytemuck::cast_slice(indices));
     }
 
     /// Update ocean uniforms
@@ -357,7 +361,7 @@ impl RenderSystem {
     }
 
     /// Render a frame (and optionally capture if recording)
-    pub fn render(&self, frame_num: usize) -> Result<(), wgpu::SurfaceError> {
+    pub fn render(&self, frame_num: usize, index_count: u32) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
         let view = output
             .texture
@@ -395,7 +399,7 @@ impl RenderSystem {
             render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-            render_pass.draw_indexed(0..self.index_count, 0, 0..1);
+            render_pass.draw_indexed(0..index_count, 0, 0..1);
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
