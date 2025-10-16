@@ -70,8 +70,12 @@ impl CameraSystem {
         let x = p.position_xz[0];
         let z = p.position_xz[1];
 
+        // Calculate velocity with acceleration: v = v0 + at
+        // Distance traveled: s = v0*t + 0.5*a*t²
+        let distance = p.initial_velocity * time_s + 0.5 * p.acceleration * time_s * time_s;
+
         // Query terrain at the "virtual" forward position (where camera would be if moving)
-        let virtual_z = z + p.simulated_velocity * time_s;
+        let virtual_z = z + distance;
         let terrain_height = get_height(x, virtual_z);
         let y = terrain_height + p.height_above_terrain_m;
 
@@ -90,15 +94,18 @@ impl CameraSystem {
     }
 
     /// Get simulated velocity for fixed/floating cameras (used to flow grid)
-    pub fn get_simulated_velocity(&self) -> Option<Vec3> {
+    ///
+    /// For floating camera with acceleration, this returns instantaneous velocity at time_s
+    pub fn get_simulated_velocity(&self, time_s: f32) -> Option<Vec3> {
         match &self.preset {
             CameraPreset::Fixed(params) => {
                 // Flow grid forward (positive Z direction)
                 Some(Vec3::new(0.0, 0.0, params.simulated_velocity))
             }
             CameraPreset::Floating(params) => {
-                // Flow grid forward (positive Z direction)
-                Some(Vec3::new(0.0, 0.0, params.simulated_velocity))
+                // Calculate current velocity: v = v0 + at
+                let velocity = params.initial_velocity + params.acceleration * time_s;
+                Some(Vec3::new(0.0, 0.0, velocity))
             }
             _ => None,
         }

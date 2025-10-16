@@ -58,8 +58,11 @@ pub struct FloatingCamera {
     /// Look-ahead distance for target (meters)
     pub look_ahead_m: f32,
 
-    /// Simulated forward velocity (m/s) to flow the grid
-    pub simulated_velocity: f32,
+    /// Initial velocity (m/s)
+    pub initial_velocity: f32,
+
+    /// Acceleration (m/s²)
+    pub acceleration: f32,
 }
 
 impl Default for FloatingCamera {
@@ -68,7 +71,8 @@ impl Default for FloatingCamera {
             position_xz: [0.0, 0.0],
             height_above_terrain_m: 20.0, // Float 20m above terrain
             look_ahead_m: 150.0,
-            simulated_velocity: 150.0,
+            initial_velocity: 50.0, // Start at 50 m/s
+            acceleration: 10.0,     // Accelerate at 10 m/s²
         }
     }
 }

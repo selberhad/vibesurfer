@@ -47,6 +47,9 @@ struct App {
     // Time tracking
     start_time: Instant,
     frame_count: usize,
+    last_fps_update: Instant,
+    last_fps_frame_count: usize,
+    fps: f32,
 }
 
 impl App {
@@ -60,6 +63,7 @@ impl App {
         let ocean = OceanSystem::new(ocean_physics, audio_mapping);
         let camera = CameraSystem::new(camera_preset);
 
+        let now = Instant::now();
         Self {
             window: None,
             render_system: None,
@@ -68,8 +72,11 @@ impl App {
             audio: None,
             render_config,
             recording_config,
-            start_time: Instant::now(),
+            start_time: now,
             frame_count: 0,
+            last_fps_update: now,
+            last_fps_frame_count: 0,
+            fps: 0.0,
         }
     }
 
@@ -189,8 +196,9 @@ impl App {
             self.camera
                 .create_view_proj_matrix(time_s, &self.render_config, Some(terrain_fn));
 
-        // For fixed camera, use simulated velocity to flow grid
-        let effective_camera_pos = if let Some(sim_vel) = self.camera.get_simulated_velocity() {
+        // For fixed/floating camera, use simulated velocity to flow grid
+        let effective_camera_pos = if let Some(sim_vel) = self.camera.get_simulated_velocity(time_s)
+        {
             camera_pos + sim_vel * time_s
         } else {
             camera_pos
@@ -235,6 +243,30 @@ impl App {
         }
 
         self.frame_count += 1;
+
+        // Update FPS in window title every 0.5 seconds
+        let now = Instant::now();
+        let elapsed = now.duration_since(self.last_fps_update).as_secs_f32();
+        if elapsed >= 0.5 {
+            let frames_elapsed = self.frame_count - self.last_fps_frame_count;
+            self.fps = frames_elapsed as f32 / elapsed;
+            self.last_fps_update = now;
+            self.last_fps_frame_count = self.frame_count;
+
+            if let Some(ref window) = self.window {
+                // Calculate current velocity for floating camera
+                let velocity_info = if let Some(vel) = self.camera.get_simulated_velocity(time_s) {
+                    format!(" | Velocity: {:.0} m/s", vel.z)
+                } else {
+                    String::new()
+                };
+
+                window.set_title(&format!(
+                    "Vibesurfer - Audio-Reactive Ocean | {:.0} FPS{}",
+                    self.fps, velocity_info
+                ));
+            }
+        }
     }
 }
 
