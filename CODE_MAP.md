@@ -10,12 +10,28 @@ Module-by-module navigation guide for Vibesurfer codebase.
 vibesurfer/
 ├── src/
 │   ├── main.rs           # Entry point, event loop, app state
-│   ├── lib.rs            # Library exports (audio, camera, ocean, params, rendering)
-│   ├── audio.rs          # Glicol synthesis + FFT analysis
+│   ├── lib.rs            # Library exports
+│   ├── cli.rs            # Command-line argument parsing
 │   ├── camera.rs         # Procedural camera paths (fixed, basic, cinematic)
-│   ├── ocean.rs          # Two-layer terrain: base hills + audio-reactive detail
-│   ├── params.rs         # Typed configuration structs with physical units
-│   └── rendering.rs      # wgpu pipeline (skybox + ocean wireframe)
+│   ├── rendering.rs      # wgpu pipeline (skybox + ocean wireframe)
+│   │
+│   ├── audio/
+│   │   ├── mod.rs        # Re-exports
+│   │   ├── system.rs     # AudioSystem with cpal integration
+│   │   ├── fft.rs        # FFT analysis thread
+│   │   └── synthesis.rs  # Glicol composition constant
+│   │
+│   ├── ocean/
+│   │   ├── mod.rs        # Re-exports, AudioBands type
+│   │   ├── mesh.rs       # OceanGrid with toroidal wrapping
+│   │   └── system.rs     # OceanSystem with audio coordination
+│   │
+│   └── params/
+│       ├── mod.rs        # Re-exports
+│       ├── audio.rs      # FFTConfig, audio_constants
+│       ├── camera.rs     # Camera presets and journey params
+│       ├── ocean.rs      # OceanPhysics, AudioReactiveMapping
+│       └── render.rs     # RenderConfig, RecordingConfig
 │
 ├── scripts/
 │   ├── combine-recording.sh         # Merge frames + audio → MP4
@@ -102,24 +118,44 @@ vibesurfer/
 
 ---
 
-### `src/audio.rs` - Audio Synthesis + FFT Analysis
+### `src/cli.rs` - Command-Line Argument Parsing
+
+**Purpose**: Parse and process command-line arguments for camera and recording configuration.
+
+**Key types**:
+- `Args` - CLI argument struct (clap Parser)
+  - `record: Option<f32>` - Recording duration
+  - `camera_preset: String` - Camera mode selection
+  - `elevation: f32` - Fixed camera altitude
+
+**Functions**:
+- `Args::parse_camera_preset()` - Convert CLI arg to CameraPreset enum
+- `Args::create_recording_config()` - Setup recording directories and config
+
+**Integration points**:
+- Called by `main.rs` during startup
+- Returns CameraPreset and optional RecordingConfig
+
+---
+
+### `src/audio/` Module - Audio Synthesis + FFT Analysis
 
 **Purpose**: Generate procedural music and extract frequency bands for visual reactivity.
+
+#### `src/audio/mod.rs` - Module Re-exports
+
+**Purpose**: Public API for audio module.
+
+**Exports**:
+- `AudioSystem` from system.rs
+
+#### `src/audio/system.rs` - Audio System Coordinator
 
 **Key types**:
 - `AudioSystem` - Main audio coordinator
   - `audio_bands: Arc<Mutex<AudioBands>>` - Shared FFT results
   - `_stream: cpal::Stream` - Audio output (kept alive)
   - `_fft_thread: JoinHandle<()>` - FFT analysis thread
-- `AudioBands` - Frequency band energies (exported to ocean.rs)
-  - `low: f32` - Bass (20-200 Hz)
-  - `mid: f32` - Mids (200-1000 Hz)
-  - `high: f32` - Highs (1000-4000 Hz)
-
-**Constants**:
-- `GLICOL_COMPOSITION` - Procedural music DSL code
-  - Gated sawtooth lead with envelope + reverb
-  - Randomized note selection via `choose`
 
 **Functions**:
 - `AudioSystem::new(fft_config, recording_config)` - Initialize audio + FFT threads
@@ -128,12 +164,6 @@ vibesurfer/
   - Spawns FFT analysis thread
   - Optionally creates WAV writer for recording
 - `AudioSystem::get_bands()` - Read current FFT bands (thread-safe)
-- `spawn_fft_thread()` - FFT analysis loop (private)
-  - Reads accumulated audio samples
-  - Applies Hann window
-  - Performs FFT (rustfft)
-  - Extracts bass/mid/high bands with normalization
-- `hann_window(index, size)` - Hann window function for FFT
 
 **Audio callback flow** (runs on audio thread):
 1. Lock Glicol engine
@@ -141,6 +171,26 @@ vibesurfer/
 3. Fill output buffer (stereo interleaved)
 4. Accumulate samples to FFT buffer
 5. Write to WAV if recording
+
+**Integration points**:
+- Called by `main.rs` during app init
+- Reads `AudioBands` via `get_bands()`
+
+**Gotchas**:
+- Hard clip to ±0.5 (safety limiter, prevents ear damage)
+- Must fill entire cpal buffer (choppy audio if partial)
+
+#### `src/audio/fft.rs` - FFT Analysis Thread
+
+**Purpose**: Background thread for real-time frequency analysis.
+
+**Functions**:
+- `spawn_fft_thread(config, fft_buffer, audio_bands)` - Launch FFT analysis loop
+  - Reads accumulated audio samples
+  - Applies Hann window
+  - Performs FFT (rustfft)
+  - Extracts bass/mid/high bands with normalization
+- `hann_window(index, size)` - Hann window function for FFT
 
 **FFT thread flow** (runs every 50ms):
 1. Check if FFT buffer has ≥1024 samples
@@ -150,14 +200,18 @@ vibesurfer/
 5. Update shared `AudioBands`
 6. Drain 50% of buffer (overlap)
 
-**Integration points**:
-- Called by `main.rs` during app init
-- `ocean.rs` reads `AudioBands` to modulate terrain
-
 **Gotchas**:
-- Hard clip to ±0.5 (safety limiter, prevents ear damage)
-- Must fill entire cpal buffer (choppy audio if partial)
 - FFT bin resolution: 44.1kHz / 1024 ≈ 43 Hz/bin
+- Must normalize by bin count for stable visual parameters
+
+#### `src/audio/synthesis.rs` - Glicol Composition
+
+**Purpose**: Procedural music synthesis configuration.
+
+**Constants**:
+- `GLICOL_COMPOSITION` - Procedural music DSL code
+  - Gated sawtooth lead with envelope + reverb
+  - Randomized note selection via `choose`
 
 ---
 
@@ -199,15 +253,32 @@ vibesurfer/
 
 ---
 
-### `src/ocean.rs` - Two-Layer Procedural Terrain
+### `src/ocean/` Module - Two-Layer Procedural Terrain
 
 **Purpose**: Generate infinite ocean surface with stable base terrain + audio-reactive detail.
 
+#### `src/ocean/mod.rs` - Module Re-exports
+
+**Purpose**: Public API for ocean module and shared types.
+
+**Types**:
+- `AudioBands` - FFT frequency band energies (shared with audio module)
+  - `low: f32` - Bass (20-200 Hz)
+  - `mid: f32` - Mids (200-1000 Hz)
+  - `high: f32` - Highs (1000-4000 Hz)
+
+**Exports**:
+- `Vertex`, `OceanGrid` from mesh.rs
+- `OceanSystem` from system.rs
+
+#### `src/ocean/mesh.rs` - Ocean Grid Mesh
+
+**Purpose**: Low-level mesh management with toroidal wrapping and Perlin noise.
+
 **Key types**:
-- `OceanSystem` - High-level ocean coordinator
-  - `grid: OceanGrid` - Mesh + Perlin noise generator
-  - `physics: OceanPhysics` - Configuration (from params.rs)
-  - `mapping: AudioReactiveMapping` - FFT → visual parameter mapping
+- `Vertex` - Mesh vertex data (`#[repr(C)]`, GPU-compatible)
+  - `position: [f32; 3]` - World position
+  - `uv: [f32; 2]` - Texture coordinates (unused currently)
 - `OceanGrid` - Mesh with procedural noise animation
   - `vertices: Vec<Vertex>` - Mesh vertices (position + UV)
   - `indices: Vec<u32>` - Triangle indices (original)
@@ -215,10 +286,6 @@ vibesurfer/
   - `perlin: Perlin` - Noise generator (seeded)
   - `last_camera_pos: Vec3` - For computing delta movement
   - `base_terrain_heights: Vec<f32>` - Cached stable terrain (future physics use)
-- `Vertex` - Mesh vertex data (`#[repr(C)]`, GPU-compatible)
-  - `position: [f32; 3]` - World position
-  - `uv: [f32; 2]` - Texture coordinates (unused currently)
-- `AudioBands` - FFT frequency band energies (re-exported from audio.rs)
 
 **Functions**:
 - `OceanGrid::new(physics)` - Create mesh + noise generator
@@ -242,6 +309,27 @@ vibesurfer/
   - Prevents phantom lines from toroidal wrapping
 - `OceanGrid::query_base_terrain(world_x, world_z, physics)` - Query stable terrain height
   - Future use: player collision detection
+
+**Integration points**:
+- Created by `OceanSystem::new()`
+- Updated by `OceanSystem::update()` each frame
+
+**Gotchas**:
+- Must use absolute world coordinates for Perlin sampling (not grid-relative)
+- Toroidal wrapping creates phantom lines (mitigated by filtering)
+- Base terrain cached but not used yet (reserved for future physics)
+
+#### `src/ocean/system.rs` - Ocean System Coordinator
+
+**Purpose**: High-level ocean coordination with audio-reactive modulation.
+
+**Key types**:
+- `OceanSystem` - Ocean coordinator
+  - `grid: OceanGrid` - Mesh + Perlin noise generator
+  - `physics: OceanPhysics` - Configuration (from params module)
+  - `mapping: AudioReactiveMapping` - FFT → visual parameter mapping
+
+**Functions**:
 - `OceanSystem::new(physics, mapping)` - Create ocean with configuration
 - `OceanSystem::update(time, audio_bands, camera_pos)`
   - Maps audio bands to detail parameters:
@@ -261,45 +349,71 @@ vibesurfer/
 - Called by `main.rs` each frame with `AudioBands` + camera position
 - Returns parameters for rendering.rs shader uniforms
 
-**Gotchas**:
-- Must use absolute world coordinates for Perlin sampling (not grid-relative)
-- Toroidal wrapping creates phantom lines (mitigated by filtering)
-- Base terrain cached but not used yet (reserved for future physics)
-
 ---
 
-### `src/params.rs` - Typed Configuration
+### `src/params/` Module - Typed Configuration
 
 **Purpose**: Extract all magic numbers into typed structs with physical units and documentation.
 
 **Philosophy**: No bare constants in code. Every value has units, meaning, and rationale.
 
+#### `src/params/mod.rs` - Module Re-exports
+
+**Purpose**: Public API for params module.
+
+**Exports**:
+- `FFTConfig`, `audio_constants` from audio.rs
+- `CameraPreset`, `CameraJourney`, `BasicCameraPath`, `FixedCamera` from camera.rs
+- `OceanPhysics`, `AudioReactiveMapping` from ocean.rs
+- `RenderConfig`, `RecordingConfig` from render.rs
+
+#### `src/params/ocean.rs` - Ocean Parameters
+
+**Purpose**: Ocean simulation physics and audio-reactive mapping configuration.
+
 **Key types**:
-- `OceanPhysics` - Ocean simulation parameters
+- `OceanPhysics` - Ocean simulation parameters (~88 lines)
   - Grid dimensions (size, spacing)
   - Base terrain (amplitude, frequency)
   - Detail layer (amplitude, frequency)
   - Noise seed
-- `FFTConfig` - FFT analysis configuration
-  - Sample rate, FFT size, update interval
-  - Frequency band ranges (bass, mid, high)
-  - Helper methods: `hz_to_bin()`, `bass_bins()`, `validate()`
 - `AudioReactiveMapping` - FFT → visual parameter mapping
   - `bass_to_amplitude_scale: 3.0`
   - `mid_to_frequency_scale: 0.15`
   - `high_to_glow_scale: 0.03`
-- `CameraPreset` - Enum of camera modes
-  - `Fixed(FixedCamera)` - Position, target, simulated velocity
-  - `Basic(BasicCameraPath)` - Altitude, speed, look-ahead
-  - `Cinematic(CameraJourney)` - Oscillation frequencies + amplitudes (many fields)
-- `RenderConfig` - Window size, FOV, clipping planes
-- `RecordingConfig` - Duration, output directory, FPS
-  - Helper methods: `total_frames()`, `frames_dir()`, `audio_path()`
+
+#### `src/params/audio.rs` - Audio Parameters
+
+**Purpose**: FFT analysis configuration and audio constants.
+
+**Key types**:
+- `FFTConfig` - FFT analysis configuration (~94 lines)
+  - Sample rate, FFT size, update interval
+  - Frequency band ranges (bass, mid, high)
+  - Helper methods: `hz_to_bin()`, `bass_bins()`, `validate()`
 
 **Module constants**:
 - `audio_constants::BLOCK_SIZE` - 128 samples (matches Glicol engine)
 
-**All structs have `Default` impls** with documented "toy2 values" (validated from experiments).
+#### `src/params/camera.rs` - Camera Parameters
+
+**Purpose**: Camera path configuration and presets.
+
+**Key types**:
+- `CameraPreset` - Enum of camera modes (~204 lines)
+  - `Fixed(FixedCamera)` - Position, target, simulated velocity
+  - `Basic(BasicCameraPath)` - Altitude, speed, look-ahead
+  - `Cinematic(CameraJourney)` - Oscillation frequencies + amplitudes (many fields)
+
+#### `src/params/render.rs` - Render Parameters
+
+**Purpose**: Rendering and recording configuration.
+
+**Key types**:
+- `RenderConfig` - Window size, FOV, clipping planes (~84 lines)
+  - Helper: `aspect_ratio()`
+- `RecordingConfig` - Duration, output directory, FPS
+  - Helper methods: `total_frames()`, `frames_dir()`, `audio_path()`
 
 **Integration points**:
 - Used by all modules to configure behavior
