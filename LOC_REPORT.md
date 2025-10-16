@@ -1,6 +1,6 @@
 # Lines of Code Report
 
-**Last Updated**: 2025-10-16 17:24
+**Last Updated**: 2025-10-16 17:26
 **Tool**: [cloc](https://github.com/AlDanial/cloc) + wc
 
 ---
@@ -9,13 +9,13 @@
 
 | Metric | Rust Code | Documentation (.md) | Total |
 |--------|-----------|---------------------|-------|
-| **Lines** | 1,433 | 2,226 | 3,659 |
-| **Comments** | 351 | - | 351 |
-| **Blank Lines** | 324 | - | 324 |
-| **Total Lines** | 2,108 | 2,226 | 4,334 |
-| **Files** | 13 | 10 | 23 |
+| **Lines** | 1,447 | 2,228 | 3,675 |
+| **Comments** | 355 | - | 355 |
+| **Blank Lines** | 329 | - | 329 |
+| **Total Lines** | 2,131 | 2,228 | 4,359 |
+| **Files** | 16 | 10 | 26 |
 
-**Documentation Ratio**: 1.55 lines of docs per line of code
+**Documentation Ratio**: 1.54 lines of docs per line of code
 
 ---
 
@@ -24,10 +24,10 @@
 ```
 Language                     files          blank        comment           code
 -------------------------------------------------------------------------------
-Rust                            13            324            351           1433
+Rust                            16            329            355           1447
 WGSL                             2             36             19            125
 -------------------------------------------------------------------------------
-SUM:                            15            360            370           1558
+SUM:                            18            365            374           1572
 -------------------------------------------------------------------------------
 ```
 
@@ -37,7 +37,10 @@ SUM:                            15            360            370           1558
 
 | File | Total Lines | Impl Lines | Test Lines | Test % | Status |
 |------|-------------|------------|------------|--------|--------|
-| `audio.rs` | 277 | 231 | 46 | 16.6% | ⚠️ Large |
+| `audio/fft.rs` | 91 | 77 | 14 | 15.4% | ✅ |
+| `audio/mod.rs` | 11 | 11 | 0 | 0.0% | ✅ |
+| `audio/synthesis.rs` | 12 | 12 | 0 | 0.0% | ✅ |
+| `audio/system.rs` | 186 | 150 | 36 | 19.4% | ✅ |
 | `camera.rs` | 209 | 128 | 81 | 38.8% | ✅ |
 | `lib.rs` | 7 | 7 | 0 | 0.0% | ✅ |
 | `main.rs` | 296 | 296 | 0 | 0.0% | ⚠️ Large |
@@ -51,7 +54,7 @@ SUM:                            15            360            370           1558
 | `params/render.rs` | 79 | 79 | 0 | 0.0% | ✅ |
 | `rendering.rs` | 502 | 502 | 0 | 0.0% | ✅ (infra) |
 
-**⚠️ Warning:** 4 file(s) over 200 impl lines - consider splitting for maintainability
+**⚠️ Warning:** 3 file(s) over 200 impl lines - consider splitting for maintainability
 
 ---
 
@@ -66,7 +69,7 @@ SUM:                            15            360            370           1558
 | `FLOWFIELD.md` | 97 |
 | `LEARNINGS.md` | 272 |
 | `LEXICON.md` | 84 |
-| `LOC_REPORT.md` | 93 |
+| `LOC_REPORT.md` | 95 |
 | `README.md` | 124 |
 | `VISION.md` | 50 |
 
@@ -76,7 +79,7 @@ SUM:                            15            360            370           1558
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| Docs/Code Ratio | ≥0.3 | 1.55 | ✅ Excellent |
+| Docs/Code Ratio | ≥0.3 | 1.54 | ✅ Excellent |
 | README exists | Yes | ✅ | Met |
 | ARCHITECTURE.md | Optional | ✅ | Optional |
 
