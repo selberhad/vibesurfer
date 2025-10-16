@@ -5,6 +5,7 @@
 
 mod audio;
 mod camera;
+mod cli;
 mod ocean;
 mod params;
 mod rendering;
@@ -22,28 +23,11 @@ use winit::{
 
 use audio::AudioSystem;
 use camera::CameraSystem;
+use cli::Args;
 use glam::Mat4;
 use ocean::OceanSystem;
 use params::*;
 use rendering::{RenderSystem, SkyboxUniforms, Uniforms};
-
-/// Command line arguments
-#[derive(Parser, Debug)]
-#[command(name = "Vibesurfer")]
-#[command(about = "Audio-reactive ocean surfing simulator", long_about = None)]
-struct Args {
-    /// Record gameplay to video (duration in seconds)
-    #[arg(long, value_name = "SECONDS")]
-    record: Option<f32>,
-
-    /// Camera preset: fixed (default), basic, cinematic
-    #[arg(long, value_name = "PRESET", default_value = "fixed")]
-    camera_preset: String,
-
-    /// Camera elevation for fixed preset (meters above origin)
-    #[arg(long, value_name = "METERS", default_value = "101")]
-    elevation: f32,
-}
 
 /// Main application state
 struct App {
@@ -257,38 +241,9 @@ fn main() {
     println!("Vibesurfer - Fluid audio-reactive ocean surfing simulator");
     println!("Initializing systems...\n");
 
-    // Parse camera preset
-    let camera_preset = match args.camera_preset.to_lowercase().as_str() {
-        "basic" => {
-            println!("Camera: Basic (straight-line flight)");
-            params::CameraPreset::Basic(params::BasicCameraPath::default())
-        }
-        "cinematic" => {
-            println!("Camera: Cinematic (procedural journey)");
-            params::CameraPreset::Cinematic(params::CameraJourney::default())
-        }
-        "fixed" => {
-            println!("Camera: Fixed (elevation: {}m)", args.elevation);
-            let mut fixed = params::FixedCamera::default();
-            fixed.position[1] = args.elevation;
-            params::CameraPreset::Fixed(fixed)
-        }
-        other => {
-            eprintln!("Warning: Unknown camera preset '{}', using fixed", other);
-            params::CameraPreset::Fixed(params::FixedCamera::default())
-        }
-    };
-
-    // Setup recording if requested
-    let recording_config = args.record.map(|duration| {
-        let config = RecordingConfig::new(duration);
-
-        // Create output directories
-        std::fs::create_dir_all(&config.frames_dir()).expect("Failed to create frames directory");
-        std::fs::create_dir_all(&config.output_dir).expect("Failed to create output directory");
-
-        config
-    });
+    // Parse camera preset and recording config
+    let camera_preset = args.parse_camera_preset();
+    let recording_config = args.create_recording_config();
 
     let mut app = App::new(camera_preset, recording_config);
     let event_loop = EventLoop::new().unwrap();

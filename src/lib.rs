@@ -2,6 +2,7 @@
 
 pub mod audio;
 pub mod camera;
+pub mod cli;
 pub mod ocean;
 pub mod params;
 pub mod rendering;
