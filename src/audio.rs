@@ -12,7 +12,7 @@ use std::thread;
 use std::time::Duration;
 
 use crate::ocean::AudioBands;
-use crate::params::{audio_constants::BLOCK_SIZE, FFTConfig};
+use crate::params::{audio_constants::BLOCK_SIZE, FFTConfig, RecordingConfig};
 
 /// Glicol composition (procedural music code)
 const GLICOL_COMPOSITION: &str = r#"
@@ -39,11 +39,30 @@ pub struct AudioSystem {
 
 impl AudioSystem {
     /// Create and start audio system with specified configuration
-    pub fn new(fft_config: FFTConfig) -> Result<Self, String> {
+    pub fn new(
+        fft_config: FFTConfig,
+        recording_config: Option<RecordingConfig>,
+    ) -> Result<Self, String> {
         // Validate FFT configuration
         fft_config
             .validate()
             .map_err(|e| format!("Invalid FFT config: {}", e))?;
+
+        // Create WAV writer if recording
+        let wav_writer: Option<Arc<Mutex<hound::WavWriter<std::io::BufWriter<std::fs::File>>>>> =
+            recording_config.as_ref().map(|config| {
+                let spec = hound::WavSpec {
+                    channels: 2,
+                    sample_rate: fft_config.sample_rate_hz as u32,
+                    bits_per_sample: 32,
+                    sample_format: hound::SampleFormat::Float,
+                };
+                let writer = hound::WavWriter::create(&config.audio_path(), spec)
+                    .expect("Failed to create WAV writer");
+                Arc::new(Mutex::new(writer))
+            });
+
+        let wav_writer_clone = wav_writer.clone();
 
         // Create Glicol engine
         let mut engine = Engine::<BLOCK_SIZE>::new();
@@ -97,6 +116,14 @@ impl AudioSystem {
                             frame[0] = left;
                             frame[1] = right;
                             fft_buf.push(left); // Accumulate for FFT analysis
+
+                            // Record to WAV if recording
+                            if let Some(ref writer) = wav_writer_clone {
+                                if let Ok(mut w) = writer.lock() {
+                                    let _ = w.write_sample(left);
+                                    let _ = w.write_sample(right);
+                                }
+                            }
                         } else {
                             frame[0] = 0.0;
                             frame[1] = 0.0;

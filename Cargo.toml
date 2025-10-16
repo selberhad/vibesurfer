@@ -13,6 +13,9 @@ bytemuck = { version = "1.14", features = ["derive"] }
 noise = "0.9"
 glam = "0.29"
 pollster = "0.3"
+clap = { version = "4.5", features = ["derive"] }
+hound = "3.5"
+image = "0.25"
 
 # Optimize dependencies for faster dev builds
 [profile.dev]

@@ -5,6 +5,7 @@ use glam::Mat4;
 use wgpu::util::DeviceExt;
 
 use crate::ocean::{OceanGrid, Vertex};
+use crate::params::RecordingConfig;
 
 /// Uniform buffer for ocean shader (view-projection matrix + parameters)
 #[repr(C)]
@@ -40,6 +41,8 @@ pub struct RenderSystem {
     skybox_uniform_buffer: wgpu::Buffer,
     skybox_bind_group: wgpu::BindGroup,
     index_count: u32,
+    recording_config: Option<RecordingConfig>,
+    window_size: (u32, u32),
 }
 
 impl RenderSystem {
@@ -47,8 +50,10 @@ impl RenderSystem {
     pub async fn new(
         window: std::sync::Arc<winit::window::Window>,
         ocean_grid: &OceanGrid,
+        recording_config: Option<RecordingConfig>,
     ) -> Result<Self, String> {
         let size = window.inner_size();
+        let window_size = (size.width, size.height);
 
         // Create wgpu instance
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -94,8 +99,15 @@ impl RenderSystem {
             .copied()
             .unwrap_or(surface_caps.formats[0]);
 
+        let mut usage = wgpu::TextureUsages::RENDER_ATTACHMENT;
+
+        // Add COPY_SRC if recording (needed for frame capture)
+        if recording_config.is_some() {
+            usage |= wgpu::TextureUsages::COPY_SRC;
+        }
+
         let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            usage,
             format: surface_format,
             width: size.width,
             height: size.height,
@@ -318,6 +330,8 @@ impl RenderSystem {
             skybox_uniform_buffer,
             skybox_bind_group,
             index_count: ocean_grid.indices.len() as u32,
+            recording_config,
+            window_size,
         })
     }
 
@@ -342,8 +356,8 @@ impl RenderSystem {
         );
     }
 
-    /// Render a frame
-    pub fn render(&self) -> Result<(), wgpu::SurfaceError> {
+    /// Render a frame (and optionally capture if recording)
+    pub fn render(&self, frame_num: usize) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
         let view = output
             .texture
@@ -385,8 +399,100 @@ impl RenderSystem {
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
+
+        // Capture frame if recording
+        if let Some(ref config) = self.recording_config {
+            self.capture_frame(frame_num, config, &output);
+        }
+
         output.present();
 
         Ok(())
+    }
+
+    /// Capture a frame to disk (recording mode only)
+    fn capture_frame(
+        &self,
+        frame_num: usize,
+        config: &RecordingConfig,
+        texture: &wgpu::SurfaceTexture,
+    ) {
+        let (width, height) = self.window_size;
+        let bytes_per_pixel = 4; // RGBA8
+        let unpadded_bytes_per_row = width * bytes_per_pixel;
+        let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
+        let padded_bytes_per_row = (unpadded_bytes_per_row + align - 1) / align * align;
+
+        // Create buffer to read texture data
+        let buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Frame Capture Buffer"),
+            size: (padded_bytes_per_row * height) as u64,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+
+        // Copy texture to buffer
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Frame Capture Encoder"),
+            });
+
+        encoder.copy_texture_to_buffer(
+            wgpu::ImageCopyTexture {
+                texture: &texture.texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::ImageCopyBuffer {
+                buffer: &buffer,
+                layout: wgpu::ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: Some(padded_bytes_per_row),
+                    rows_per_image: Some(height),
+                },
+            },
+            wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+        );
+
+        self.queue.submit(std::iter::once(encoder.finish()));
+
+        // Map buffer and save to PNG
+        let buffer_slice = buffer.slice(..);
+        buffer_slice.map_async(wgpu::MapMode::Read, |_| {});
+        self.device.poll(wgpu::Maintain::Wait);
+
+        let data = buffer_slice.get_mapped_range();
+        let mut image_data = vec![0u8; (width * height * bytes_per_pixel) as usize];
+
+        // Remove padding
+        for y in 0..height {
+            let padded_offset = (y * padded_bytes_per_row) as usize;
+            let unpadded_offset = (y * unpadded_bytes_per_row) as usize;
+            image_data[unpadded_offset..unpadded_offset + unpadded_bytes_per_row as usize]
+                .copy_from_slice(
+                    &data[padded_offset..padded_offset + unpadded_bytes_per_row as usize],
+                );
+        }
+
+        drop(data);
+        buffer.unmap();
+
+        // Save as PNG
+        let frame_path = format!("{}/frame_{:05}.png", config.frames_dir(), frame_num);
+        if let Err(e) = image::save_buffer(
+            &frame_path,
+            &image_data,
+            width,
+            height,
+            image::ColorType::Rgba8,
+        ) {
+            eprintln!("Failed to save frame {}: {}", frame_num, e);
+        }
     }
 }

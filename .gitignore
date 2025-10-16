@@ -1,5 +1,6 @@
 # Rust build artifacts
 /target/
+Cargo.lock
 **/*.rs.bk
 *.pdb
 
@@ -15,3 +16,9 @@
 
 # Debug artifacts
 *.log
+
+# Recording artifacts
+/recording/
+
+# Session handoff files
+HANDOFF.md

@@ -9,6 +9,7 @@ mod ocean;
 mod params;
 mod rendering;
 
+use clap::Parser;
 use std::sync::Arc;
 use std::time::Instant;
 use winit::{
@@ -26,6 +27,16 @@ use ocean::OceanSystem;
 use params::*;
 use rendering::{RenderSystem, SkyboxUniforms, Uniforms};
 
+/// Command line arguments
+#[derive(Parser, Debug)]
+#[command(name = "Skiwave")]
+#[command(about = "Audio-reactive ocean surfing simulator", long_about = None)]
+struct Args {
+    /// Record gameplay to video (duration in seconds)
+    #[arg(long, value_name = "SECONDS")]
+    record: Option<f32>,
+}
+
 /// Main application state
 struct App {
     // Window and rendering
@@ -39,13 +50,15 @@ struct App {
 
     // Configuration
     render_config: RenderConfig,
+    recording_config: Option<RecordingConfig>,
 
     // Time tracking
     start_time: Instant,
+    frame_count: usize,
 }
 
 impl App {
-    fn new() -> Self {
+    fn new(recording_config: Option<RecordingConfig>) -> Self {
         // Create default parameters
         let ocean_physics = OceanPhysics::default();
         let audio_mapping = AudioReactiveMapping::default();
@@ -63,8 +76,14 @@ impl App {
             camera,
             audio: None,
             render_config,
+            recording_config,
             start_time: Instant::now(),
+            frame_count: 0,
         }
+    }
+
+    fn is_recording(&self) -> bool {
+        self.recording_config.is_some()
     }
 }
 
@@ -91,15 +110,26 @@ impl ApplicationHandler for App {
         let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
 
         // Initialize rendering system
-        let render_system =
-            pollster::block_on(RenderSystem::new(Arc::clone(&window), &self.ocean.grid)).unwrap();
+        let render_system = pollster::block_on(RenderSystem::new(
+            Arc::clone(&window),
+            &self.ocean.grid,
+            self.recording_config.clone(),
+        ))
+        .unwrap();
 
         // Initialize audio system
         let fft_config = FFTConfig::default();
-        let audio = AudioSystem::new(fft_config).unwrap();
+        let audio = AudioSystem::new(fft_config, self.recording_config.clone()).unwrap();
 
-        println!("\nSkiwave is running!");
-        println!("Press ESC to quit\n");
+        if self.is_recording() {
+            let cfg = self.recording_config.as_ref().unwrap();
+            println!("\n🎬 Recording mode: {} seconds", cfg.duration_secs);
+            println!("   Output: {}/", cfg.output_dir);
+            println!("   Frames: {} @ {}fps", cfg.total_frames(), cfg.fps);
+        } else {
+            println!("\nSkiwave is running!");
+            println!("Press ESC to quit\n");
+        }
 
         self.window = Some(window);
         self.render_system = Some(render_system);
@@ -125,6 +155,18 @@ impl ApplicationHandler for App {
             } => event_loop.exit(),
             WindowEvent::RedrawRequested => {
                 self.render_frame();
+
+                // Check if recording is complete
+                if self.is_recording() {
+                    let cfg = self.recording_config.as_ref().unwrap();
+                    if self.frame_count >= cfg.total_frames() {
+                        println!(
+                            "\n✅ Recording complete! {} frames captured",
+                            self.frame_count
+                        );
+                        event_loop.exit();
+                    }
+                }
             }
             _ => {}
         }
@@ -182,18 +224,34 @@ impl App {
         };
         render_system.update_skybox_uniforms(&skybox_uniforms);
 
-        // Render
-        if let Err(e) = render_system.render() {
+        // Render (and capture if recording)
+        if let Err(e) = render_system.render(self.frame_count) {
             eprintln!("Render error: {:?}", e);
         }
+
+        self.frame_count += 1;
     }
 }
 
 fn main() {
+    // Parse command line arguments
+    let args = Args::parse();
+
     println!("Skiwave - Fluid audio-reactive ocean surfing simulator");
     println!("Initializing systems...\n");
 
-    let mut app = App::new();
+    // Setup recording if requested
+    let recording_config = args.record.map(|duration| {
+        let config = RecordingConfig::new(duration);
+
+        // Create output directories
+        std::fs::create_dir_all(&config.frames_dir()).expect("Failed to create frames directory");
+        std::fs::create_dir_all(&config.output_dir).expect("Failed to create output directory");
+
+        config
+    });
+
+    let mut app = App::new(recording_config);
     let event_loop = EventLoop::new().unwrap();
     let _ = event_loop.run_app(&mut app);
 }
