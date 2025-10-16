@@ -1,6 +1,6 @@
 # Lines of Code Report
 
-**Last Updated**: 2025-10-16 05:34
+**Last Updated**: 2025-10-16 05:43
 **Tool**: [cloc](https://github.com/AlDanial/cloc) + wc
 
 ---
@@ -9,13 +9,13 @@
 
 | Metric | Rust Code | Documentation (.md) | Total |
 |--------|-----------|---------------------|-------|
-| **Lines** | 1,217 | 1,425 | 2,642 |
-| **Comments** | 281 | - | 281 |
-| **Blank Lines** | 265 | - | 265 |
-| **Total Lines** | 1,763 | 1,425 | 3,188 |
+| **Lines** | 1,292 | 1,428 | 2,720 |
+| **Comments** | 298 | - | 298 |
+| **Blank Lines** | 282 | - | 282 |
+| **Total Lines** | 1,872 | 1,428 | 3,300 |
 | **Files** | 7 | 8 | 15 |
 
-**Documentation Ratio**: 1.17 lines of docs per line of code
+**Documentation Ratio**: 1.11 lines of docs per line of code
 
 ---
 
@@ -24,10 +24,10 @@
 ```
 Language                     files          blank        comment           code
 -------------------------------------------------------------------------------
-Rust                             7            265            281           1217
+Rust                             7            282            298           1292
 WGSL                             2             36             19            125
 -------------------------------------------------------------------------------
-SUM:                             9            301            300           1342
+SUM:                             9            318            317           1417
 -------------------------------------------------------------------------------
 ```
 
@@ -38,11 +38,11 @@ SUM:                             9            301            300           1342
 | File | Total Lines | Impl Lines | Test Lines | Test % | Status |
 |------|-------------|------------|------------|--------|--------|
 | `audio.rs` | 269 | 223 | 46 | 17.1% | ⚠️ Large |
-| `camera.rs` | 142 | 86 | 56 | 39.4% | ✅ |
+| `camera.rs` | 190 | 109 | 81 | 42.6% | ✅ |
 | `lib.rs` | 7 | 7 | 0 | 0.0% | ✅ |
-| `main.rs` | 257 | 257 | 0 | 0.0% | ⚠️ Large |
+| `main.rs` | 279 | 279 | 0 | 0.0% | ⚠️ Large |
 | `ocean.rs` | 207 | 171 | 36 | 17.4% | ✅ |
-| `params.rs` | 383 | 383 | 0 | 0.0% | ✅ (infra) |
+| `params.rs` | 422 | 422 | 0 | 0.0% | ✅ (infra) |
 | `rendering.rs` | 498 | 498 | 0 | 0.0% | ✅ (infra) |
 
 **⚠️ Warning:** 2 file(s) over 200 impl lines - consider splitting for maintainability
@@ -59,7 +59,7 @@ SUM:                             9            301            300           1342
 | `HANDOFF.md` | 333 |
 | `LEARNINGS.md` | 272 |
 | `LEXICON.md` | 84 |
-| `LOC_REPORT.md` | 84 |
+| `LOC_REPORT.md` | 87 |
 | `VISION.md` | 50 |
 
 ---
@@ -68,7 +68,7 @@ SUM:                             9            301            300           1342
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| Docs/Code Ratio | ≥0.3 | 1.17 | ✅ Excellent |
+| Docs/Code Ratio | ≥0.3 | 1.11 | ✅ Excellent |
 | README exists | Yes | ❌ | Missing |
 | ARCHITECTURE.md | Optional | ❌ | Optional |
 

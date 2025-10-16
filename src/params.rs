@@ -160,6 +160,45 @@ impl Default for AudioReactiveMapping {
     }
 }
 
+/// Basic camera path parameters (simple straight-line flight)
+#[derive(Debug, Clone)]
+pub struct BasicCameraPath {
+    /// Constant altitude (meters)
+    pub altitude_m: f32,
+
+    /// Forward movement speed (meters per second)
+    pub forward_speed_m_per_s: f32,
+
+    /// Look-ahead distance (meters)
+    pub look_ahead_m: f32,
+}
+
+impl Default for BasicCameraPath {
+    fn default() -> Self {
+        Self {
+            altitude_m: 50.0,
+            forward_speed_m_per_s: 8.0,
+            look_ahead_m: 100.0,
+        }
+    }
+}
+
+/// Camera preset selection
+#[derive(Debug, Clone)]
+pub enum CameraPreset {
+    /// Cinematic preset: complex procedural path with sweeping arcs and altitude changes
+    Cinematic(CameraJourney),
+
+    /// Basic preset: straight-line flight at constant altitude, looking forward
+    Basic(BasicCameraPath),
+}
+
+impl Default for CameraPreset {
+    fn default() -> Self {
+        Self::Cinematic(CameraJourney::default())
+    }
+}
+
 /// Camera journey path parameters (procedural cinematic path)
 #[derive(Debug, Clone)]
 pub struct CameraJourney {

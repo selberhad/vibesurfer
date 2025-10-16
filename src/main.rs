@@ -22,7 +22,7 @@ use winit::{
 
 use audio::AudioSystem;
 use camera::CameraSystem;
-use glam::{Mat4, Vec3};
+use glam::Mat4;
 use ocean::OceanSystem;
 use params::*;
 use rendering::{RenderSystem, SkyboxUniforms, Uniforms};
@@ -35,6 +35,10 @@ struct Args {
     /// Record gameplay to video (duration in seconds)
     #[arg(long, value_name = "SECONDS")]
     record: Option<f32>,
+
+    /// Camera preset: cinematic (default), basic
+    #[arg(long, value_name = "PRESET", default_value = "cinematic")]
+    camera_preset: String,
 }
 
 /// Main application state
@@ -58,16 +62,15 @@ struct App {
 }
 
 impl App {
-    fn new(recording_config: Option<RecordingConfig>) -> Self {
+    fn new(camera_preset: params::CameraPreset, recording_config: Option<RecordingConfig>) -> Self {
         // Create default parameters
         let ocean_physics = OceanPhysics::default();
         let audio_mapping = AudioReactiveMapping::default();
-        let camera_params = CameraJourney::default();
         let render_config = RenderConfig::default();
 
         // Initialize systems
         let ocean = OceanSystem::new(ocean_physics, audio_mapping);
-        let camera = CameraSystem::new(camera_params);
+        let camera = CameraSystem::new(camera_preset);
 
         Self {
             window: None,
@@ -198,8 +201,8 @@ impl App {
         let (amplitude, frequency, line_width) =
             self.ocean.update(time_s, &audio_bands, camera_pos);
 
-        // Create model matrix to translate ocean grid to camera XZ position
-        let model = Mat4::from_translation(Vec3::new(camera_pos.x, 0.0, camera_pos.z));
+        // Ocean grid stays at world origin - camera moves relative to it
+        let model = Mat4::IDENTITY;
         let mvp = view_proj * model;
 
         // Update ocean vertices
@@ -240,6 +243,25 @@ fn main() {
     println!("Skiwave - Fluid audio-reactive ocean surfing simulator");
     println!("Initializing systems...\n");
 
+    // Parse camera preset
+    let camera_preset = match args.camera_preset.to_lowercase().as_str() {
+        "basic" => {
+            println!("Camera: Basic (straight-line flight)");
+            params::CameraPreset::Basic(params::BasicCameraPath::default())
+        }
+        "cinematic" => {
+            println!("Camera: Cinematic (procedural journey)");
+            params::CameraPreset::Cinematic(params::CameraJourney::default())
+        }
+        other => {
+            eprintln!(
+                "Warning: Unknown camera preset '{}', using cinematic",
+                other
+            );
+            params::CameraPreset::Cinematic(params::CameraJourney::default())
+        }
+    };
+
     // Setup recording if requested
     let recording_config = args.record.map(|duration| {
         let config = RecordingConfig::new(duration);
@@ -251,7 +273,7 @@ fn main() {
         config
     });
 
-    let mut app = App::new(recording_config);
+    let mut app = App::new(camera_preset, recording_config);
     let event_loop = EventLoop::new().unwrap();
     let _ = event_loop.run_app(&mut app);
 }
