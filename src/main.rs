@@ -3,13 +3,6 @@
 //! The surface behaves like living music: waves pulse to the beat,
 //! currents shimmer with color, and your motion becomes rhythm.
 
-mod audio;
-mod camera;
-mod cli;
-mod ocean;
-mod params;
-mod rendering;
-
 use clap::Parser;
 use std::sync::Arc;
 use std::time::Instant;
@@ -21,13 +14,13 @@ use winit::{
     window::{Window, WindowId},
 };
 
-use audio::AudioSystem;
-use camera::CameraSystem;
-use cli::Args;
 use glam::Mat4;
-use ocean::OceanSystem;
-use params::*;
-use rendering::{RenderSystem, SkyboxUniforms, Uniforms};
+use vibesurfer::audio::AudioSystem;
+use vibesurfer::camera::CameraSystem;
+use vibesurfer::cli::Args;
+use vibesurfer::ocean::OceanSystem;
+use vibesurfer::params::*;
+use vibesurfer::rendering::{RenderSystem, SkyboxUniforms, Uniforms};
 
 /// Main application state
 struct App {
@@ -53,7 +46,7 @@ struct App {
 }
 
 impl App {
-    fn new(camera_preset: params::CameraPreset, recording_config: Option<RecordingConfig>) -> Self {
+    fn new(camera_preset: CameraPreset, recording_config: Option<RecordingConfig>) -> Self {
         // Create default parameters
         let ocean_physics = OceanPhysics::default();
         let audio_mapping = AudioReactiveMapping::default();

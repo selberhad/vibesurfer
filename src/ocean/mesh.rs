@@ -2,8 +2,8 @@
 
 use bytemuck::{Pod, Zeroable};
 use glam::Vec3;
-use noise::{NoiseFn, Perlin};
 
+use crate::noise::NoiseGenerator;
 use crate::params::OceanPhysics;
 
 /// Vertex data for ocean mesh (position + UV coordinates)
@@ -20,7 +20,7 @@ pub struct OceanGrid {
     pub indices: Vec<u32>,
     /// Filtered indices (excludes stretched triangles from wrapping)
     pub filtered_indices: Vec<u32>,
-    perlin: Perlin,
+    noise: NoiseGenerator,
     grid_size: usize,
     grid_spacing: f32,
     /// Last camera position (for computing delta movement)
@@ -80,7 +80,7 @@ impl OceanGrid {
             vertices,
             indices,
             filtered_indices,
-            perlin: Perlin::new(physics.noise_seed),
+            noise: NoiseGenerator::new(physics.noise_seed),
             grid_size: physics.grid_size,
             grid_spacing: physics.grid_spacing_m,
             last_camera_pos: Vec3::ZERO,
@@ -97,11 +97,11 @@ impl OceanGrid {
     pub fn query_base_terrain(&self, world_x: f32, world_z: f32, physics: &OceanPhysics) -> f32 {
         let t = 0.0; // Base terrain is time-independent (static hills)
 
-        let noise_value = self.perlin.get([
+        let noise_value = self.noise.sample_3d(
             (world_x * physics.base_terrain_frequency) as f64,
             (world_z * physics.base_terrain_frequency) as f64,
             t as f64,
-        ]) as f32;
+        );
 
         noise_value * physics.base_terrain_amplitude_m
     }
@@ -165,11 +165,11 @@ impl OceanGrid {
             // Layer 1: Base terrain (stable, time-independent hills)
             // Only recompute if this vertex was just wrapped (changed position)
             let base_height = if wrapped || self.dirty_base_terrain[idx] {
-                let base_noise = self.perlin.get([
+                let base_noise = self.noise.sample_3d(
                     (x_world * physics.base_terrain_frequency) as f64,
                     (z_world * physics.base_terrain_frequency) as f64,
                     0.0, // Time-independent for stable terrain
-                ]) as f32;
+                );
                 let h = base_noise * physics.base_terrain_amplitude_m;
                 self.base_terrain_heights[idx] = h;
                 self.dirty_base_terrain[idx] = false;
@@ -180,11 +180,11 @@ impl OceanGrid {
             };
 
             // Layer 2: Detail (audio-reactive, animated)
-            let detail_noise = self.perlin.get([
+            let detail_noise = self.noise.sample_3d(
                 (x_world * detail_frequency) as f64,
                 (z_world * detail_frequency) as f64,
                 detail_t as f64,
-            ]) as f32;
+            );
             let detail_height = detail_noise * detail_amplitude_m;
 
             // Combine layers for visual rendering
