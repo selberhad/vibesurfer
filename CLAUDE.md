@@ -12,25 +12,50 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Core Methodology
 
-This project follows **Dialectic-Driven Development (DDD)** - a learning-driven workflow optimized for human-AI collaboration. See the `LEXICON.md` for guidance vectors that shape how we work.
+This project follows **Dialectic-Driven Development (DDD)** - a learning-driven workflow optimized for human-AI collaboration, orchestrated by **[Hegel](https://github.com/dialecticianai/hegel-cli)**.
+
+> **Note**: Hegel must be installed and available in PATH. Check with `command -v hegel`. If not installed, clone hegel-cli and run `cargo build --release`, then add to PATH or use `./target/release/hegel`.
+
+**Meta-mode**: `learning` (Research ↔ Discovery loop for greenfield exploration)
 
 **Cycle**: Docs → Tests → Implementation → Learnings
 
 **Long-term deliverable**: A playable, procedurally-generated surfing experience that captures pure flow. Documentation captures architectural insights and methodology learnings as we build.
 
-## Operational Modes
+### Using Hegel for Workflow Orchestration
 
-### Discovery Mode (Primary in Early Phase)
-- **When to use**: Learning Rust game dev patterns, validating procedural techniques, testing audio-visual integration
-- **Cycle**: SPEC (desired behavior) → TOY implementation → LEARNINGS → Apply to main game
-- **Focus**: Understanding performance constraints, testing techniques, validating assumptions
-- **Output**: Toy implementations in `toys/` - kept as reference artifacts
+**Check status** before starting:
+```bash
+hegel status  # View current workflow and phase
+```
 
-### Execution Mode
-- **When to use**: Building the actual game with validated patterns
-- **Cycle**: Design → Implement → Test → Refactor
-- **Focus**: Working within constraints, reusing learned patterns
-- **Output**: Game modules with documented architecture and subsystems
+**Start or transition workflows**:
+```bash
+hegel meta learning       # Declare learning meta-mode (first time only)
+hegel start research      # External knowledge gathering
+hegel start discovery     # Toy implementation and validation
+```
+
+**Advance through phases**:
+```bash
+hegel next     # Happy path (automatic claim inference)
+hegel restart  # Return to beginning of cycle
+hegel repeat   # Re-display current phase prompt
+```
+
+See [HEGEL_CLAUDE.md](https://github.com/dialecticianai/hegel-cli/blob/main/HEGEL_CLAUDE.md) for complete usage guide.
+
+## Workflow Modes
+
+### Research Mode (External Knowledge Gathering)
+- **When**: Before implementing unfamiliar techniques
+- **Phases**: PLAN → STUDY → ASSESS → QUESTIONS
+- **Output**: Learning docs in `learnings/`, questions for Discovery
+
+### Discovery Mode (Toy Experiments)
+- **When**: Validating techniques, testing performance, answering questions
+- **Phases**: SPEC → PLAN → CODE → LEARNINGS → README
+- **Output**: Toy implementations in `toys/` (kept as reference)
 
 ## Guidance Vectors (from LEXICON)
 
@@ -215,6 +240,14 @@ cargo run --release -- --record 10 --camera-preset fixed --elevation 80
 - **Descriptive commits**: Include subsystem (e.g., "feat(wavefield): implement FFT synthesis")
 - **History**: Keep linear history (prefer rebase; avoid merge commits)
 - **Documentation updates**: Update affected CODE_MAP.md/LEARNINGS.md BEFORE committing
+
+**Optional: Use Hegel's git guardrails**
+```bash
+# Wrap git commands for safety (if .hegel/guardrails.yaml configured)
+hegel git add .
+hegel git commit -m "feat(ocean): add FFT synthesis"
+hegel git push
+```
 
 ### Next Step Protocol
 **Never just report what you did - always suggest what to do next:**
@@ -402,22 +435,31 @@ _Toys validate complex patterns and techniques before integrating into productio
 **Purpose:** 100-200 words context refresh for AI; what it does, key API, gotchas
 **Contains:** One-liner, purpose, essential types/functions, core concepts, gotchas
 
-## Workflow Summary
+## Hegel Workflow Integration
 
-### Discovery Mode Cycle
-1. **Docs**: Write SPEC.md and PLAN.md for toy
-2. **Tests**: Derive executable tests from SPEC.md (use Rust test framework + criterion)
-3. **Implementation**: Minimal code to pass tests; benchmark against targets
-4. **Learnings**: Update LEARNINGS.md with findings, constraints, patterns
+**Hegel orchestrates the DDD cycles**. The workflow prompts guide you through each phase with specific deliverables.
 
-### Execution Mode Cycle
-1. **Docs**: Update SPEC/PLAN for feature; update CODE_MAP.md before structural changes
-2. **Tests**: Write tests first (unit + integration + benchmarks)
-3. **Implementation**: Minimal code to pass tests
-4. **Refactor**: Mandatory refactoring after each feature (extract patterns, simplify)
+### When Hegel Prompts Appear
 
-### Mandatory Refactoring
-Not optional. Core discipline in both modes. Keeps codebase quality rising instead of decaying.
+Each phase has a structured prompt from Hegel (loaded from embedded guides):
+- **SPEC phase**: Behavioral contract writing guidance
+- **PLAN phase**: Test-driven implementation roadmap
+- **CODE phase**: TDD execution with step-by-step progress
+- **LEARNINGS phase**: Insights extraction and constraint documentation
+
+**Follow the prompts** - they contain phase-specific requirements and best practices.
+
+### Advancing Phases
+
+```bash
+# Complete current phase deliverable first, then:
+hegel next
+
+# If you need to restart (e.g., discovered fundamental issue):
+hegel restart
+```
+
+Hegel tracks your progress in `.hegel/state.json` and logs transitions in `.hegel/states.jsonl`.
 
 ## Self-Audit Checklist (Before Proposing Changes)
 
