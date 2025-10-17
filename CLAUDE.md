@@ -24,6 +24,16 @@ This project follows **Dialectic-Driven Development (DDD)** - a learning-driven 
 
 ### Using Hegel for Workflow Orchestration
 
+**When to use hegel workflows**:
+- Building toy experiments to validate unfamiliar techniques (Discovery mode)
+- Researching external knowledge before implementation (Research mode)
+- Complex features requiring structured planning and learning capture
+
+**When to work directly**:
+- Simple, straightforward tasks
+- Bug fixes or small refactors
+- User hasn't requested structured workflow
+
 **Check status** before starting:
 ```bash
 hegel status  # View current workflow and phase
@@ -43,19 +53,12 @@ hegel restart  # Return to beginning of cycle
 hegel repeat   # Re-display current phase prompt
 ```
 
-See [HEGEL_CLAUDE.md](https://github.com/dialecticianai/hegel-cli/blob/main/HEGEL_CLAUDE.md) for complete usage guide.
-
-## Workflow Modes
-
-### Research Mode (External Knowledge Gathering)
-- **When**: Before implementing unfamiliar techniques
-- **Phases**: PLAN → STUDY → ASSESS → QUESTIONS
-- **Output**: Learning docs in `learnings/`, questions for Discovery
-
-### Discovery Mode (Toy Experiments)
-- **When**: Validating techniques, testing performance, answering questions
-- **Phases**: SPEC → PLAN → CODE → LEARNINGS → README
-- **Output**: Toy implementations in `toys/` (kept as reference)
+**How it works**:
+- Each phase displays a prompt with embedded guidance (SPEC_WRITING, PLAN_WRITING, etc.)
+- Follow the prompt to create the required artifact (SPEC.md, PLAN.md, LEARNINGS.md, etc.)
+- State tracked in `.hegel/state.json`, transitions logged in `.hegel/states.jsonl`
+- Workflow guides you through: SPEC → PLAN → CODE → LEARNINGS → README (Discovery mode)
+- Run `hegel` without arguments for complete usage guide
 
 ## Guidance Vectors (from LEXICON)
 
@@ -120,13 +123,6 @@ cargo run --release -- --record 10 --camera-preset fixed --elevation 80
 
 ## Development Best Practices
 
-**CRITICAL: Full Autonomy Required**
-- **NEVER ask the user to test manually** (e.g., "run the game and see", "test in your browser")
-- **You are a scientist on another planet** - figure everything out autonomously
-- **Only automated testing counts** - if the test harness can't verify it, find another way
-- **Goal**: LLM can develop games end-to-end without human intervention
-- If blocked: Create simpler tests, build new tools, investigate deeper - don't delegate to human
-
 **CRITICAL: Document Constraints**
 - Modern Rust games have constraints (frame budgets, memory usage, GPU limits, audio latency)
 - When hitting a constraint, document it in CONSTRAINTS.md with workaround
@@ -137,7 +133,6 @@ cargo run --release -- --record 10 --camera-preset fixed --elevation 80
 - Procedural generation behavior is non-obvious (noise coherence, FFT synthesis, audio-visual sync)
 - Build toy implementations to validate understanding BEFORE integrating into main game
 - One toy per subsystem (wavefield_test, audio_synth_test, flow_tracker_test, etc.)
-- Document test results in LEARNINGS.md
 - **All testing must be automated** - use test harness, build tools, write benchmarks
 
 **CRITICAL: Architecture Map Everything**
@@ -146,33 +141,12 @@ cargo run --release -- --record 10 --camera-preset fixed --elevation 80
 - Track performance budgets (frame time, memory, audio buffer size)
 - Note design patterns and why they were chosen
 
-## Learning Documentation Practices
+## Learning Documentation
 
-**Systematic exploration workflow**:
-1. **Explore**: Research Rust game dev patterns, procedural generation techniques, audio synthesis approaches
-2. **Document**: Create/update `learnings/topic.md` with patterns and code examples
-3. **Experiment**: Build toy implementations in `toys/` to validate approaches
-4. **Assess**: After each exploration phase, create `learnings/.ddd/N_description.md` documenting:
-   - What we explored
-   - Key insights gained
-   - Questions raised (theory vs practice)
-   - Decisions made
-   - Recommended next steps
-
-**Organization**:
-- **Technical learnings**: `learnings/*.md` (architecture, techniques, constraints)
-- **Meta-learnings**: `learnings/.ddd/N_*.md` (progress tracking, numbered sequentially)
-- **Open questions**: `learnings/.ddd/open_questions.md` (consolidated, cross-referenced)
-
-**Theory vs Practice**:
-- Document theory in learning docs first (from research)
-- Mark what needs practical validation
-- Update docs with actual measurements after toy implementations
-
-**Toy implementation workflow**:
-- See `TOY_DEV.md` section below for full methodology
-- One toy per subsystem or technique (focused experiments)
-- Update learning docs with real performance numbers and edge cases
+Use hegel workflows (Research/Discovery modes) for structured exploration. Document findings in:
+- `learnings/*.md` - Technical insights, constraints, patterns
+- `learnings/.ddd/` - Meta-learnings from DDD cycles
+- Update with real measurements after toy implementations
 
 ## Platform: macOS Apple Silicon (ARM64)
 
@@ -181,57 +155,35 @@ cargo run --release -- --record 10 --camera-preset fixed --elevation 80
 **Rust Toolchain**:
 - Rust stable (latest)
 - cargo for build management
-- rustfmt for code formatting
-- clippy for linting
 
 **Graphics/Audio**:
 - wgpu for cross-platform graphics (native + WebGPU)
 - cpal for cross-platform audio
 - Consider bevy or macroquad for game framework (TBD based on needs)
 
-## Tooling & Utility Belt
+## Tooling
 
-**Philosophy**: Pick the tool that allows the most concise, elegant solution with minimal external dependencies.
-
-**Mindset**: You are a pragmatic systems programmer. Embrace simplicity: small tools that do one thing well, composed with pipes and process substitution.
+**Philosophy**: Pick the tool that allows the most concise, elegant solution with minimal dependencies.
 
 **Engineering Discipline**:
 - Never over-engineer. Try the simplest thing first.
-- RTFM before building anything. Read docs, understand the problem space, then act.
-- **CRITICAL: Write a script as soon as a useful pattern repeats.** Don't wait for pain - automate immediately.
-  - If you're about to run similar commands 2+ times, STOP and write a tool.
-  - Example: Repeatedly running benchmarks with different params → write `tools/bench.sh` instead.
-  - Tools save tokens and create reusable infrastructure.
+- RTFM before building. Read docs, understand the problem, then act.
+- Write a script when a pattern repeats - don't wait for pain.
 
-**Preference Stack**:
-- Rust (type safety, performance, ownership model for game dev)
-- Shell scripts (simple automation, glue code)
-- Python (prototyping, data analysis, visualization)
+**Stack**: Rust (core), shell scripts (automation), Python (analysis)
 
-**Dependency Policy**:
-- Minimize external dependencies for core game modules
-- Well-established crates from crates.io are fine (don't reinvent the wheel)
-- Standard library preferred over third-party when close enough
-- Document why a dependency was chosen if non-obvious
-
-**Use Cases**:
-- Graphics rendering: wgpu or game framework
-- Audio synthesis: cpal + custom DSP or audio crate
-- Build scripts: Cargo build system + shell scripts for automation
-- Performance analysis: criterion.rs for benchmarks, flamegraph for profiling
-- Asset generation (if needed): Whatever fits the task
+**Dependencies**: Minimize for core modules. Use established crates. Document non-obvious choices.
 
 ## Documentation Structure
 
 ### CODE_MAP.md Convention
-**CRITICAL: Keep CODE_MAP.md up-to-date with architecture**
 
-- **Scope**: One CODE_MAP.md per significant module directory
-- **Content**:
-  - Root CODE_MAP.md: Project structure, workspace layout, main modules
-  - Module documentation (purpose, data flow, performance characteristics)
-- **Update trigger**: Before any commit that changes structure or module boundaries
-- **Architecture notes**: Document WHY patterns were chosen (ECS for parallelism, etc.)
+**CRITICAL**: Update before any commit that changes structure or module boundaries.
+
+Document:
+- Module purpose and data flow
+- WHY patterns were chosen (not just what they are)
+- Performance characteristics
 
 ### Commit Guidelines
 **Use conventional commit format for all commits:**
@@ -239,7 +191,7 @@ cargo run --release -- --record 10 --camera-preset fixed --elevation 80
 - **Types**: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `perf`
 - **Descriptive commits**: Include subsystem (e.g., "feat(wavefield): implement FFT synthesis")
 - **History**: Keep linear history (prefer rebase; avoid merge commits)
-- **Documentation updates**: Update affected CODE_MAP.md/LEARNINGS.md BEFORE committing
+- **Documentation updates**: Update affected CODE_MAP.md BEFORE committing
 
 **Optional: Use Hegel's git guardrails**
 ```bash
@@ -250,6 +202,7 @@ hegel git push
 ```
 
 ### Next Step Protocol
+
 **Never just report what you did - always suggest what to do next:**
 - After completing any task, propose the next logical action
 - Don't say "done" or "ready for next step" - suggest a specific next move
@@ -257,76 +210,8 @@ hegel git push
 - **Wait for explicit approval before proceeding**
 
 **Format**: "Should I [specific action], or [alternative]?"
-- Good: "Should I start building the wavefield toy implementation, or explore audio synthesis first?"
-- Bad: "Continue, or wrap up?" (too vague)
-- Bad: "Ready for next session." (declares stopping instead of proposing)
 
-**Examples**:
-  - "Created exploration plan. Should I start researching Rust procedural generation crates?"
-  - "Built wavefield toy. Should I integrate it with audio synthesis toy to test the feedback loop?"
-  - "Profiled rendering pipeline. Should I optimize the shader or investigate CPU bottleneck first?"
-
-### Blog Post Guidelines (docs/blog/)
-
-**Before writing:** Consider whether the insight merits a blog post (major milestones, pivots, deep learnings).
-
-**Style:**
-- First-person AI perspective ("I observed...", "We discovered...")
-- Reflective but concrete (numbers, not philosophizing)
-- **Bold key concepts**, `code in backticks`, *italics for emphasis*
-- Questions → answers pattern, concrete examples
-- Honest about pivots/failures (not just successes)
-
-**Structure:**
-- Header: Date, Phase, Author
-- Clear sections with `---` dividers (one point each)
-- "**The result:**" / "**The lesson:**" summaries
-- "What's Next" forward-looking close
-
-**Themes:** Documentation as deliverable, theory vs practice, procedural generation insights, performance lessons
-
-**Length:** 150-250 lines max.
-
-## Toy Model Development
-
-_Toys validate complex patterns and techniques before integrating into production code. They remain in the repo as reference artifacts._
-
-### What Toy Models Are
-
-- **Pattern validators**: Test unfamiliar techniques, libraries, or approaches in isolation
-- **Performance provers**: Validate that techniques meet frame budget and performance requirements
-- **Reference implementations**: Code stays in repo as examples showing "this technique works"
-- **Risk reducers**: Validate complex subsystems before integrating into main game
-
-### What Toy Models Are Not
-
-- Not production code (production code lives in workspace crates)
-- Not comprehensive solutions (focus on one subsystem or technique)
-- Not deleted after use (kept as reference, allowed dead code)
-- Not shortcuts (experiments inform proper implementation)
-
-### The Toy Model Cycle
-
-**CRITICAL**: Every toy starts AND ends with LEARNINGS.md
-
-1. **Define Learning Goals (LEARNINGS.md - First Pass)**
-   - Questions to answer (e.g., "Can FFT synthesis run in 16ms frame budget?")
-   - Decisions to make (e.g., "Which audio synthesis approach to use?")
-   - Success criteria (what patterns must be clear)
-
-2. **Research & Implementation Loop**
-   - Study reference documentation/examples
-   - Try approaches in isolated context
-   - Benchmark against performance targets
-   - **Update LEARNINGS.md with findings after each cycle**
-
-3. **Finalize Learnings (LEARNINGS.md - Final Pass)**
-   - Answer all initial questions
-   - Document chosen approach and rationale
-   - Patterns and techniques discovered
-   - How to integrate into main codebase
-
-### Testing Philosophy
+## Testing Philosophy
 
 **For Rust Code:**
 - Use Rust's built-in test framework (`#[test]`, `#[bench]`)
@@ -337,33 +222,8 @@ _Toys validate complex patterns and techniques before integrating into productio
 **Performance Validation:**
 - Target: 60 FPS (16.67ms frame budget)
 - Measure with criterion benchmarks and profiling tools
-- Document actual timings vs targets in LEARNINGS.md
-
-**Patterns That Work:**
-- **Library validation toys**: Test unfamiliar crates/APIs in isolation
-- **Technique exploration toys**: Experiment with procedural generation patterns
-- **Subsystem toys**: Understand one module (wavefield, audio synth, flow tracker) before integration
-- **Integration toys**: Test how two validated subsystems interact
-
-### Toy Integration Convention
-- Each `toys/toyN_name/` directory must contain SPEC.md, PLAN.md, and LEARNINGS.md
-- If a SPEC or PLAN grows too large, split scope into new toy
-- Integration toys combine two validated base toys
-- Always bias toward minimal scope: smaller toys, fewer docs, clearer insights
-
-### Axis Principle
-- A base toy isolates exactly one axis of complexity
-- An integration toy merges exactly two axes to probe their interaction
-- Never exceed two axes per toy
-- This discipline keeps learnings sharp and mirrors controlled experiments
 
 ## Rust-Specific Guidelines
-
-**Code Style**:
-- Follow rustfmt defaults (run `cargo fmt` before commits)
-- Use clippy and address warnings (`cargo clippy`)
-- Document public APIs with doc comments (`///`)
-- Group related functionality with modules
 
 **Performance Considerations**:
 - Profile before optimizing (flamegraph, perf, Instruments.app on macOS)
@@ -377,107 +237,19 @@ _Toys validate complex patterns and techniques before integrating into productio
 - Benchmark critical paths with criterion
 - Property tests for procedural generation (same seed → same output)
 
-**Module Architecture**:
-- `vibesurfer-core`: Platform-agnostic game logic (ECS, flow system, game state)
-- `vibesurfer-native`: Native rendering, audio, input (wgpu, cpal, winit)
-- `vibesurfer-web`: WebGPU/WebAudio bindings (same core logic)
+## Architecture Documentation
 
-## Architecture Principles
-
-**Procedural Everything**:
-- Ocean surface from noise + FFT synthesis
-- Music from procedural synthesis (not pre-recorded)
-- Lighting from mathematical functions
-- Zero static assets (code and math only)
-
-**Audio-Visual Unity**:
-- Shared waveform parameters drive both sound and surface
-- Music frequency bands map to ocean geometry (low=swells, mid=chop, high=sparkle)
-- Player motion modulates synth parameters (speed→stereo width, jumps→harmonic bloom)
-
-**Flow as Core Mechanic**:
-- Flow tracker: `flow = sigmoid(smoothness * speed * timing)`
-- Higher flow → calmer ocean, more melodic music
-- Lost rhythm → dissonance and turbulence
-
-**Separation of Concerns**:
-- Core logic deterministic and testable (no I/O in core)
-- Platform layers wrap core with rendering/audio/input
-- Same core logic runs native and web
-
-**Performance Budget**:
-- 60 FPS target (16.67ms frame budget)
-- Wavefield update: <5ms
-- Audio synthesis: <3ms
-- Rendering: <8ms
-- Remaining: input, physics, game logic
-
-## DDD Core Artifacts
-
-### SPEC.md
-**Purpose:** Comprehensive behavioral contract for current scope
-**Contains:** Input/output formats, invariants, state shapes, operations, validation rules, test scenarios
-
-### PLAN.md
-**Purpose:** Strategic roadmap with stepwise sequence using Docs → Tests → Impl cadence
-**Contains:** Test vs skip decisions, order of steps, timeboxing, dependencies, risks, success checkboxes
-
-### LEARNINGS.md
-**Purpose:** Retrospective capturing architectural insights, pivots, constraints, reusable patterns
-**Used in:** Discovery mode (required), Execution mode (optional - only if unexpected insights)
-
-### CODE_MAP.md
-**Purpose:** Living architectural map; concise module-by-module documentation
-**Contains:** Module descriptions, data flow, integration points
-**Update trigger:** Before any structural commit
-
-### README.md (per module)
-**Purpose:** 100-200 words context refresh for AI; what it does, key API, gotchas
-**Contains:** One-liner, purpose, essential types/functions, core concepts, gotchas
-
-## Hegel Workflow Integration
-
-**Hegel orchestrates the DDD cycles**. The workflow prompts guide you through each phase with specific deliverables.
-
-### When Hegel Prompts Appear
-
-Each phase has a structured prompt from Hegel (loaded from embedded guides):
-- **SPEC phase**: Behavioral contract writing guidance
-- **PLAN phase**: Test-driven implementation roadmap
-- **CODE phase**: TDD execution with step-by-step progress
-- **LEARNINGS phase**: Insights extraction and constraint documentation
-
-**Follow the prompts** - they contain phase-specific requirements and best practices.
-
-### Advancing Phases
-
-```bash
-# Complete current phase deliverable first, then:
-hegel next
-
-# If you need to restart (e.g., discovered fundamental issue):
-hegel restart
-```
-
-Hegel tracks your progress in `.hegel/state.json` and logs transitions in `.hegel/states.jsonl`.
+**CRITICAL**: Keep architectural documentation up-to-date
+- **ARCHITECTURE.md**: System design, data flow, performance budget, key constraints
+- **CODE_MAP.md**: Module-by-module navigation, entry points, integration points
+- Update these BEFORE committing any structural changes
 
 ## Self-Audit Checklist (Before Proposing Changes)
 
 - Tests pass (`cargo test`)
 - Benchmarks meet targets (if performance-critical)
-- Code formatted (`cargo fmt`)
-- No clippy warnings (`cargo clippy`)
 - Docs updated (CODE_MAP.md if structural, README.md if API changed)
-- LEARNINGS.md updated (if insights emerged)
 - Commit message follows conventional format
-
-## Success Criteria (Per Feature/Toy)
-
-- Minimal implementation demonstrates core mechanism end-to-end
-- Tests derived from SPEC pass; performance benchmarks meet targets
-- Meta-docs in sync: README, SPEC, PLAN, CODE_MAP.md updated
-- LEARNINGS.md adds architectural insights or constraints (Discovery mode)
-- Code quality maintained (rustfmt, clippy, refactoring done)
 
 ## Simplification Heuristics
 
@@ -528,10 +300,6 @@ Your mandate is not to produce maximal code, but to produce maximal clarity with
 - Artifacts are disposable; clarity is durable
 - Comprehensive generation enables focused simplification
 
-**Vibesurfer-specific focus:**
-- Procedural generation quality (noise coherence, FFT synthesis)
-- Audio-visual synchronization (music drives terrain, motion modulates sound)
-- Performance targets (60 FPS, <16ms frame budget)
-- Flow mechanics (smooth motion → melodic world, lost rhythm → chaos)
+See ARCHITECTURE.md and VISION.md for the technical and aesthetic vision.
 
 Operate accordingly. Build the instrument. Surf the sound.
