@@ -14,10 +14,11 @@ struct TerrainParams {
     detail_amplitude: f32,    // audio-modulated detail height
     detail_frequency: f32,    // audio-modulated choppiness
     camera_pos: vec3<f32>,    // world-space camera position
+    _padding1: f32,           // Align camera_pos to 16 bytes
     grid_size: u32,           // vertices per side (512 or 1024)
     grid_spacing: f32,        // meters between vertices (2.0)
     time: f32,                // seconds (for animation)
-    _padding: f32,
+    _padding2: f32,
 }
 
 @group(0) @binding(0) var<storage, read_write> vertices: array<Vertex>;

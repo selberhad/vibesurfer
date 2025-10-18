@@ -1,6 +1,10 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use toy2_gpu_terrain_pipeline::{
+    create_perspective_view_proj_matrix, generate_grid_indices, CameraUniforms, TerrainParams,
+    Vertex,
+};
 use winit::{
     application::ApplicationHandler,
     event::*,
@@ -8,37 +12,6 @@ use winit::{
     keyboard::{KeyCode, PhysicalKey},
     window::{Window, WindowId},
 };
-
-// === Data Structures ===
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct Vertex {
-    position: [f32; 3],
-    _padding1: f32, // Align position to 16 bytes
-    uv: [f32; 2],
-    _padding2: [f32; 2], // Pad to 32 bytes for WGSL storage array alignment
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct TerrainParams {
-    base_amplitude: f32,
-    base_frequency: f32,
-    detail_amplitude: f32,
-    detail_frequency: f32,
-    camera_pos: [f32; 3],
-    grid_size: u32,
-    grid_spacing: f32,
-    time: f32,
-    _padding: f32,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct CameraUniforms {
-    view_proj: [[f32; 4]; 4],
-}
 
 // === FPS Tracker ===
 
@@ -122,33 +95,6 @@ struct App {
 }
 
 impl App {
-    fn generate_indices(grid_size: u32) -> Vec<u32> {
-        let mut indices = Vec::new();
-        // Generate line segments for a wireframe grid
-        // Horizontal lines (connect vertices in same row)
-        for z in 0..grid_size {
-            for x in 0..grid_size - 1 {
-                let i = z * grid_size + x;
-                indices.push(i);
-                indices.push(i + 1);
-            }
-        }
-        // Vertical lines (connect vertices in same column)
-        for z in 0..grid_size - 1 {
-            for x in 0..grid_size {
-                let i = z * grid_size + x;
-                indices.push(i);
-                indices.push(i + grid_size);
-            }
-        }
-
-        // Debug: print first few indices
-        println!("Grid size: {}, Total indices: {}", grid_size, indices.len());
-        println!("First 20 indices: {:?}", &indices[..20.min(indices.len())]);
-
-        indices
-    }
-
     async fn new(window: Arc<Window>) -> Self {
         let size = window.inner_size();
         let grid_size = 512u32; // Medium scale: 262,144 vertices
@@ -271,10 +217,11 @@ impl App {
             detail_amplitude: 2.0, // Small ripples (will be modulated)
             detail_frequency: 0.1, // Fine detail (will be modulated)
             camera_pos: [0.0, 0.0, 0.0],
+            _padding1: 0.0,
             grid_size,
             grid_spacing: 100.0, // 100m between vertices (very wide spacing)
             time: 0.0,           // Animation time
-            _padding: 0.0,
+            _padding2: 0.0,
         };
 
         let terrain_params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
@@ -395,11 +342,9 @@ impl App {
             cache: None,
         });
 
-        // Initialize camera (orthographic top-down view)
+        // Initialize camera (perspective view, following motion)
         let aspect = size.width as f32 / size.height as f32;
-        // Show the entire smaller grid
-        let extent = grid_size as f32 * terrain_params.grid_spacing;
-        let view_proj = Self::create_view_proj_matrix(extent, aspect);
+        let view_proj = create_perspective_view_proj_matrix(0.0, aspect);
         queue.write_buffer(
             &camera_buffer,
             0,
@@ -407,8 +352,10 @@ impl App {
         );
 
         // Generate index buffer for wireframe triangles
-        let indices = Self::generate_indices(grid_size);
+        let indices = generate_grid_indices(grid_size);
         let index_count = indices.len() as u32;
+        println!("Grid size: {}, Total indices: {}", grid_size, index_count);
+        println!("First 20 indices: {:?}", &indices[..20.min(indices.len())]);
 
         let index_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Index Buffer"),
@@ -446,18 +393,6 @@ impl App {
         }
     }
 
-    fn create_view_proj_matrix(extent: f32, _aspect: f32) -> [[f32; 4]; 4] {
-        // Simple orthographic top-down: X->clipX, Z->clipY
-        let scale = 2.0 / extent;
-
-        [
-            [scale, 0.0, 0.0, 0.0], // world_x -> clip_x
-            [0.0, 0.0, 0.0, 0.0],   // ignore Y (height)
-            [0.0, scale, 0.0, 0.0], // world_z -> clip_y
-            [-1.0, -1.0, 0.0, 1.0], // center at origin
-        ]
-    }
-
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
             self.size = new_size;
@@ -480,6 +415,15 @@ impl App {
         let camera_speed = 10.0;
         let camera_z = time * camera_speed;
 
+        // Update camera matrix to follow forward motion
+        let aspect = self.size.width as f32 / self.size.height as f32;
+        let view_proj = create_perspective_view_proj_matrix(camera_z, aspect);
+        self.queue.write_buffer(
+            &self.camera_buffer,
+            0,
+            bytemuck::bytes_of(&CameraUniforms { view_proj }),
+        );
+
         // Update terrain parameters with audio modulation
         let terrain_params = TerrainParams {
             base_amplitude: 100.0,
@@ -487,10 +431,11 @@ impl App {
             detail_amplitude: 2.0 + audio_low * 3.0, // Bass modulates amplitude
             detail_frequency: 0.1 + audio_mid * 0.15, // Mids modulate frequency
             camera_pos: [0.0, 0.0, camera_z],
+            _padding1: 0.0,
             grid_size: self.grid_size,
             grid_spacing: 100.0, // 100m between vertices
             time,
-            _padding: 0.0,
+            _padding2: 0.0,
         };
 
         self.queue.write_buffer(

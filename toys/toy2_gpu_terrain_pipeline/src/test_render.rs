@@ -1,40 +1,29 @@
-// Headless rendering test for debugging wireframe
-use bytemuck::{Pod, Zeroable};
+// Headless rendering test with perspective camera
+use std::env;
+use toy2_gpu_terrain_pipeline::{
+    create_perspective_view_proj_matrix, generate_grid_indices, CameraUniforms, TerrainParams,
+    Vertex,
+};
 
 const WIDTH: u32 = 1280;
 const HEIGHT: u32 = 720;
-const GRID_SIZE: u32 = 256; // Clear grid visualization
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, Pod, Zeroable)]
-struct Vertex {
-    position: [f32; 3],
-    _padding1: f32,
-    uv: [f32; 2],
-    _padding2: [f32; 2], // Pad to 32 bytes for WGSL array alignment
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, Pod, Zeroable)]
-struct TerrainParams {
-    base_amplitude: f32,
-    base_frequency: f32,
-    grid_size: u32,
-    grid_spacing: f32,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, Pod, Zeroable)]
-struct CameraUniforms {
-    view_proj: [[f32; 4]; 4],
-}
+const GRID_SIZE: u32 = 512;
 
 fn main() {
-    pollster::block_on(render_test());
+    // Parse camera_z from command line (default to 5 seconds @ 10m/s = 50m)
+    let args: Vec<String> = env::args().collect();
+    let camera_z = if args.len() > 1 {
+        args[1].parse::<f32>().unwrap_or(50.0)
+    } else {
+        50.0
+    };
+
+    println!("Rendering at camera_z = {}m", camera_z);
+    pollster::block_on(render_frame(camera_z));
 }
 
-async fn render_test() {
-    // Setup wgpu without window
+async fn render_frame(camera_z: f32) {
+    // Setup wgpu headless
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
         backends: wgpu::Backends::all(),
         ..Default::default()
@@ -62,7 +51,7 @@ async fn render_test() {
         .await
         .unwrap();
 
-    // Create render target texture
+    // Create render target
     let texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("Render Target"),
         size: wgpu::Extent3d {
@@ -80,42 +69,31 @@ async fn render_test() {
 
     let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-    // Create vertex buffer and initialize with sentinel values
+    // Create vertex buffer
     let vertex_count = GRID_SIZE * GRID_SIZE;
-    println!("Vertex size: {} bytes", std::mem::size_of::<Vertex>());
-    println!("Vertex count: {}", vertex_count);
-    println!(
-        "Total buffer size: {} bytes",
-        vertex_count as usize * std::mem::size_of::<Vertex>()
-    );
-
-    let init_vertices: Vec<Vertex> = (0..vertex_count)
-        .map(|_i| Vertex {
-            position: [-999.0, -999.0, -999.0],
-            _padding1: 0.0,
-            uv: [-1.0, -1.0],
-            _padding2: [0.0, 0.0],
-        })
-        .collect();
-
     let vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Vertex Buffer"),
         size: (vertex_count as u64) * std::mem::size_of::<Vertex>() as u64,
-        usage: wgpu::BufferUsages::STORAGE
-            | wgpu::BufferUsages::VERTEX
-            | wgpu::BufferUsages::COPY_SRC
-            | wgpu::BufferUsages::COPY_DST,
+        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::VERTEX,
         mapped_at_creation: false,
     });
 
-    queue.write_buffer(&vertex_buffer, 0, bytemuck::cast_slice(&init_vertices));
+    // Terrain parameters (simulating time-based audio)
+    let time = camera_z / 10.0; // camera moves at 10m/s
+    let audio_low = 5.0 + 5.0 * (time * 0.5).sin();
+    let audio_mid = 3.0 + 2.0 * (time * 1.0).sin();
 
-    // Create terrain params
     let terrain_params = TerrainParams {
         base_amplitude: 100.0,
         base_frequency: 0.003,
+        detail_amplitude: 2.0 + audio_low * 3.0,
+        detail_frequency: 0.1 + audio_mid * 0.15,
+        camera_pos: [0.0, 0.0, camera_z],
+        _padding1: 0.0,
         grid_size: GRID_SIZE,
         grid_spacing: 100.0,
+        time,
+        _padding2: 0.0,
     };
 
     let terrain_params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
@@ -129,6 +107,23 @@ async fn render_test() {
         &terrain_params_buffer,
         0,
         bytemuck::bytes_of(&terrain_params),
+    );
+
+    // Camera with perspective projection
+    let aspect = WIDTH as f32 / HEIGHT as f32;
+    let view_proj = create_perspective_view_proj_matrix(camera_z, aspect);
+
+    let camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("Camera Buffer"),
+        size: std::mem::size_of::<CameraUniforms>() as u64,
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+
+    queue.write_buffer(
+        &camera_buffer,
+        0,
+        bytemuck::bytes_of(&CameraUniforms { view_proj }),
     );
 
     // Load shaders
@@ -200,29 +195,6 @@ async fn render_test() {
         cache: None,
     });
 
-    // Create camera
-    let extent = GRID_SIZE as f32 * terrain_params.grid_spacing;
-    let scale = 2.0 / extent;
-    let view_proj = [
-        [scale, 0.0, 0.0, 0.0],
-        [0.0, 0.0, 0.0, 0.0],
-        [0.0, scale, 0.0, 0.0],
-        [-1.0, -1.0, 0.0, 1.0],
-    ];
-
-    let camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("Camera Buffer"),
-        size: std::mem::size_of::<CameraUniforms>() as u64,
-        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    });
-
-    queue.write_buffer(
-        &camera_buffer,
-        0,
-        bytemuck::bytes_of(&CameraUniforms { view_proj }),
-    );
-
     // Create render pipeline
     let camera_bind_group_layout =
         device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -272,7 +244,7 @@ async fn render_test() {
                     },
                     wgpu::VertexAttribute {
                         format: wgpu::VertexFormat::Float32x2,
-                        offset: 16, // After position + padding
+                        offset: 16,
                         shader_location: 1,
                     },
                 ],
@@ -299,10 +271,7 @@ async fn render_test() {
     });
 
     // Generate indices
-    let indices = generate_indices(GRID_SIZE);
-    println!("Grid size: {}, Total indices: {}", GRID_SIZE, indices.len());
-    println!("First 40 indices: {:?}", &indices[..40.min(indices.len())]);
-
+    let indices = generate_grid_indices(GRID_SIZE);
     let index_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Index Buffer"),
         size: (indices.len() * std::mem::size_of::<u32>()) as u64,
@@ -329,73 +298,6 @@ async fn render_test() {
         compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
     }
 
-    // Debug: Read back ALL vertices
-    let debug_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("Debug Buffer"),
-        size: (vertex_count as u64) * std::mem::size_of::<Vertex>() as u64,
-        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-        mapped_at_creation: false,
-    });
-
-    encoder.copy_buffer_to_buffer(
-        &vertex_buffer,
-        0,
-        &debug_buffer,
-        0,
-        (vertex_count as u64) * std::mem::size_of::<Vertex>() as u64,
-    );
-
-    queue.submit(Some(encoder.finish()));
-
-    let debug_slice = debug_buffer.slice(..);
-    debug_slice.map_async(wgpu::MapMode::Read, |_| {});
-    device.poll(wgpu::Maintain::Wait);
-
-    let debug_data = debug_slice.get_mapped_range();
-    let vertices: &[Vertex] = bytemuck::cast_slice(&debug_data);
-    println!("\nAll {} vertices after compute:", vertices.len());
-    println!("First row (vertices 0-9):");
-    for i in 0..10 {
-        let v = &vertices[i];
-        println!(
-            "  V{}: pos=({}, {}, {})",
-            i, v.position[0], v.position[1], v.position[2]
-        );
-    }
-    println!("Second row (vertices 10-19):");
-    for i in 10..20 {
-        let v = &vertices[i];
-        println!(
-            "  V{}: pos=({}, {}, {})",
-            i, v.position[0], v.position[1], v.position[2]
-        );
-    }
-
-    // Find last written vertex
-    let mut last_written = 0;
-    for i in 0..vertices.len() {
-        if vertices[i].position[0] != -999.0 {
-            last_written = i;
-        }
-    }
-    println!("\nLast written vertex: {}", last_written);
-
-    println!("Vertices around index 74-75:");
-    for i in 70..80 {
-        let v = &vertices[i];
-        println!(
-            "  V{}: pos=({}, {}, {}), uv=({}, {})",
-            i, v.position[0], v.position[1], v.position[2], v.uv[0], v.uv[1]
-        );
-    }
-    drop(debug_data);
-    debug_buffer.unmap();
-
-    // Create new encoder for rendering
-    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-        label: Some("Render Encoder"),
-    });
-
     // Render pass
     {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -420,11 +322,8 @@ async fn render_test() {
         render_pass.draw_indexed(0..indices.len() as u32, 0, 0..1);
     }
 
-    // Copy texture to buffer
-    let bytes_per_row = WIDTH * 4;
-    let unpadded_bytes_per_row = WIDTH * 4;
-    let padded_bytes_per_row = ((unpadded_bytes_per_row + 255) / 256) * 256;
-
+    // Copy texture to buffer for saving
+    let padded_bytes_per_row = ((WIDTH * 4 + 255) / 256) * 256;
     let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Output Buffer"),
         size: (padded_bytes_per_row * HEIGHT) as u64,
@@ -462,17 +361,16 @@ async fn render_test() {
     device.poll(wgpu::Maintain::Wait);
 
     let data = buffer_slice.get_mapped_range();
-
-    // Remove padding
     let mut image_data = Vec::with_capacity((WIDTH * HEIGHT * 4) as usize);
     for row in 0..HEIGHT {
         let start = (row * padded_bytes_per_row) as usize;
-        let end = start + bytes_per_row as usize;
+        let end = start + (WIDTH * 4) as usize;
         image_data.extend_from_slice(&data[start..end]);
     }
 
+    let filename = format!("frame_z{}.png", camera_z as i32);
     image::save_buffer(
-        "debug_wireframe.png",
+        &filename,
         &image_data,
         WIDTH,
         HEIGHT,
@@ -480,26 +378,5 @@ async fn render_test() {
     )
     .unwrap();
 
-    println!("Saved debug_wireframe.png");
-}
-
-fn generate_indices(grid_size: u32) -> Vec<u32> {
-    let mut indices = Vec::new();
-    // Horizontal lines
-    for z in 0..grid_size {
-        for x in 0..grid_size - 1 {
-            let i = z * grid_size + x;
-            indices.push(i);
-            indices.push(i + 1);
-        }
-    }
-    // Vertical lines
-    for z in 0..grid_size - 1 {
-        for x in 0..grid_size {
-            let i = z * grid_size + x;
-            indices.push(i);
-            indices.push(i + grid_size);
-        }
-    }
-    indices
+    println!("Saved {}", filename);
 }
