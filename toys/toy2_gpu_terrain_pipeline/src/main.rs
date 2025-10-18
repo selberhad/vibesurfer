@@ -44,6 +44,8 @@ struct FpsTracker {
     frame_times: VecDeque<Duration>,
     last_frame: Instant,
     last_print: Instant,
+    min_fps: f32,
+    max_fps: f32,
 }
 
 impl FpsTracker {
@@ -53,6 +55,8 @@ impl FpsTracker {
             frame_times: VecDeque::new(),
             last_frame: now,
             last_print: now,
+            min_fps: f32::MAX,
+            max_fps: 0.0,
         }
     }
 
@@ -66,10 +70,17 @@ impl FpsTracker {
             self.frame_times.pop_front();
         }
 
+        // Track min/max FPS
+        let current_fps = self.current_fps();
+        if current_fps > 0.0 {
+            self.min_fps = self.min_fps.min(current_fps);
+            self.max_fps = self.max_fps.max(current_fps);
+        }
+
         // Print FPS every second
         if now - self.last_print > Duration::from_secs(1) {
-            let fps = self.current_fps();
-            println!("FPS: {:.1}", fps);
+            let (min, avg, max) = self.stats();
+            println!("FPS - Min: {:.1}, Avg: {:.1}, Max: {:.1}", min, avg, max);
             self.last_print = now;
         }
     }
@@ -87,6 +98,10 @@ impl FpsTracker {
         } else {
             0.0
         }
+    }
+
+    fn stats(&self) -> (f32, f32, f32) {
+        (self.min_fps, self.current_fps(), self.max_fps)
     }
 }
 
