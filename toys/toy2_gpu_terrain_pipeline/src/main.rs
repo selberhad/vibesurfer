@@ -25,8 +25,12 @@ struct Vertex {
 struct TerrainParams {
     base_amplitude: f32,
     base_frequency: f32,
+    detail_amplitude: f32,
+    detail_frequency: f32,
     grid_size: u32,
     grid_spacing: f32,
+    time: f32,
+    _padding: f32,
 }
 
 #[repr(C)]
@@ -112,6 +116,7 @@ struct App {
     index_count: u32,
 
     fps_tracker: FpsTracker,
+    start_time: Instant,
     window: Arc<Window>,
 }
 
@@ -262,8 +267,12 @@ impl App {
         let terrain_params = TerrainParams {
             base_amplitude: 100.0, // 100m hills
             base_frequency: 0.003, // Long wavelengths
+            detail_amplitude: 2.0, // Small ripples (will be modulated)
+            detail_frequency: 0.1, // Fine detail (will be modulated)
             grid_size,
             grid_spacing: 100.0, // 100m between vertices (very wide spacing)
+            time: 0.0,           // Animation time
+            _padding: 0.0,
         };
 
         let terrain_params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
@@ -430,6 +439,7 @@ impl App {
             index_buffer,
             index_count,
             fps_tracker: FpsTracker::new(),
+            start_time: Instant::now(),
             window,
         }
     }
@@ -456,6 +466,32 @@ impl App {
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+        // Calculate elapsed time
+        let time = self.start_time.elapsed().as_secs_f32();
+
+        // Simulate audio bands (sine waves)
+        let audio_low = 5.0 + 5.0 * (time * 0.5).sin();
+        let audio_mid = 3.0 + 2.0 * (time * 1.0).sin();
+        let _audio_high = 2.0 + 1.0 * (time * 2.0).sin();
+
+        // Update terrain parameters with audio modulation
+        let terrain_params = TerrainParams {
+            base_amplitude: 100.0,
+            base_frequency: 0.003,
+            detail_amplitude: 2.0 + audio_low * 3.0, // Bass modulates amplitude
+            detail_frequency: 0.1 + audio_mid * 0.15, // Mids modulate frequency
+            grid_size: self.grid_size,
+            grid_spacing: 100.0, // 100m between vertices
+            time,
+            _padding: 0.0,
+        };
+
+        self.queue.write_buffer(
+            &self.terrain_params_buffer,
+            0,
+            bytemuck::bytes_of(&terrain_params),
+        );
+
         let output = self.surface.get_current_texture()?;
         let view = output
             .texture

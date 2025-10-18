@@ -11,8 +11,12 @@ struct Vertex {
 struct TerrainParams {
     base_amplitude: f32,      // meters (e.g., 150.0)
     base_frequency: f32,      // cycles/meter (e.g., 0.003)
+    detail_amplitude: f32,    // audio-modulated detail height
+    detail_frequency: f32,    // audio-modulated choppiness
     grid_size: u32,           // vertices per side (512 or 1024)
     grid_spacing: f32,        // meters between vertices (2.0)
+    time: f32,                // seconds (for animation)
+    _padding: f32,
 }
 
 @group(0) @binding(0) var<storage, read_write> vertices: array<Vertex>;
@@ -123,8 +127,18 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let world_x = f32(x) * params.grid_spacing;
     let world_z = f32(z) * params.grid_spacing;
 
-    // DEBUG: Flat terrain
-    let height = 0.0;
+    // Sample base terrain (static, large hills)
+    let base_coord_x = world_x * 0.1 * params.base_frequency;
+    let base_coord_z = world_z * 0.1 * params.base_frequency;
+    let base_height = simplex3d(vec3<f32>(base_coord_x, base_coord_z, 0.0)) * params.base_amplitude;
+
+    // Sample detail layer (animated, audio-reactive)
+    let detail_coord_x = world_x * 0.1 * params.detail_frequency;
+    let detail_coord_z = world_z * 0.1 * params.detail_frequency;
+    let detail_height = simplex3d(vec3<f32>(detail_coord_x, detail_coord_z, params.time)) * params.detail_amplitude;
+
+    // Combine layers
+    let height = base_height + detail_height;
 
     // Write vertex data
     vertices[idx].position = vec3<f32>(world_x, height, world_z);
