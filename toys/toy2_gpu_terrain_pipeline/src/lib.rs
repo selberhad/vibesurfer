@@ -48,22 +48,27 @@ pub struct CameraUniforms {
 
 // === Camera Math ===
 
-pub fn create_perspective_view_proj_matrix(_camera_z: f32, _aspect: f32) -> [[f32; 4]; 4] {
-    // TEMPORARY: Use the original working orthographic projection from Step 3
-    // This is a simple top-down view (looking down Y axis)
-    let grid_size = 512;
-    let grid_spacing = 2.0;
-    let extent = grid_size as f32 * grid_spacing; // 1024m
-    let half = extent / 2.0;
+pub fn create_perspective_view_proj_matrix(camera_z: f32, aspect: f32) -> [[f32; 4]; 4] {
+    // Use glam for correct matrix math - proven implementation
+    use glam::{Mat4, Vec3};
 
-    // Original working matrix from commit 9aad205
-    // Swaps Y and Z axes to look down from above
-    [
-        [1.0 / half, 0.0, 0.0, 0.0],
-        [0.0, 0.0, 1.0 / half, 0.0],
-        [0.0, 1.0 / 100.0, 0.0, 0.0],
-        [0.0, 0.0, 0.0, 1.0],
-    ]
+    // Camera position: 80m above terrain, centered horizontally, moving forward
+    let eye = Vec3::new(512.0, 80.0, camera_z);
+
+    // Look at: 300m ahead, 20m above terrain for horizon view
+    let target = Vec3::new(512.0, 20.0, camera_z + 300.0);
+
+    // World up
+    let up = Vec3::Y;
+
+    // Build view matrix using glam's look_at_rh (right-handed)
+    let view = Mat4::look_at_rh(eye, target, up);
+
+    // Perspective projection: 60° FOV, aspect ratio, near=1m, far=2000m
+    let proj = Mat4::perspective_rh(60.0_f32.to_radians(), aspect, 1.0, 2000.0);
+
+    // Combine and return as array
+    (proj * view).to_cols_array_2d()
 }
 
 // === Index Generation ===
