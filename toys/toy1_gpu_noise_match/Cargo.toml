@@ -1,0 +1,17 @@
+[package]
+name = "toy1_gpu_noise_match"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+noise = "0.9"
+image = "0.25"
+clap = { version = "4.0", features = ["derive"] }
+
+[[bin]]
+name = "toy1_cpu"
+path = "src/bin/toy1_cpu.rs"
+
+[[bin]]
+name = "toy1_gpu"
+path = "src/bin/toy1_gpu.rs"
