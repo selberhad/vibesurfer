@@ -102,9 +102,9 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         return;
     }
 
-    // Scale coordinates by frequency
-    let nx = f32(x) * params.frequency;
-    let ny = f32(y) * params.frequency;
+    // Scale coordinates by frequency (scaled down to match CPU)
+    let nx = f32(x) * params.frequency * 0.1;
+    let ny = f32(y) * params.frequency * 0.1;
 
     // Sample 3D simplex noise (z=0 for 2D heightmap)
     let noise_val = simplex3d(vec3<f32>(nx, ny, 0.0));
