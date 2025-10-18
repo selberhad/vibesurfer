@@ -387,6 +387,107 @@ positions[idx].y = new_height;
 
 ---
 
+## WGSL Storage Buffer Alignment (CRITICAL)
+
+### The Problem: Silent Buffer Overflows
+
+**Symptom**: Compute shader only processes first N elements of array, remaining elements untouched
+
+**Example**: 100-vertex grid, only 75 vertices computed, remaining 25 at (0,0,0) or garbage
+
+**Root cause**: WGSL storage buffer arrays require structs padded to **next 16-byte multiple**
+
+### Alignment Rules
+
+**Rule 1: Individual field alignment**
+```wgsl
+vec3<f32>  // 12 bytes data, but requires 16-byte alignment
+vec2<f32>  // 8 bytes data, 8-byte alignment
+f32        // 4 bytes data, 4-byte alignment
+```
+
+**Rule 2: Array element alignment** (THE CRITICAL ONE)
+```wgsl
+array<MyStruct>  // Each element must start at 16-byte multiple
+```
+
+**Example that FAILS**:
+```rust
+// Rust side
+#[repr(C)]
+struct Vertex {
+    position: [f32; 3],  // 12 bytes
+    _padding1: f32,      // 4 bytes → 16 bytes total
+    uv: [f32; 2],        // 8 bytes
+    // Total: 24 bytes
+}
+```
+
+```wgsl
+// WGSL side
+struct Vertex {
+    position: vec3<f32>,  // 12 bytes, 16-byte aligned
+    _padding1: f32,       // 4 bytes
+    uv: vec2<f32>,        // 8 bytes
+    // Total: 24 bytes in Rust, BUT...
+}
+
+@group(0) @binding(0) var<storage, read_write> vertices: array<Vertex>;
+```
+
+**What actually happens**:
+- Rust allocates buffer: `100 vertices × 24 bytes = 2400 bytes`
+- WGSL expects: `vertices[N]` at offset `N × 32` (next 16-byte multiple after 24)
+- WGSL writes `vertices[75]` at byte 2400 → **buffer overflow!**
+- Vertices 76-99 never written (or write out of bounds)
+
+### The Fix: Pad to 32 Bytes
+
+```rust
+// Rust side - CORRECT
+#[repr(C)]
+struct Vertex {
+    position: [f32; 3],   // 12 bytes
+    _padding1: f32,       // 4 bytes → 16 bytes
+    uv: [f32; 2],         // 8 bytes
+    _padding2: [f32; 2],  // 8 bytes → 32 bytes total
+}
+// Now: 100 vertices × 32 bytes = 3200 bytes
+```
+
+```wgsl
+// WGSL side - CORRECT
+struct Vertex {
+    position: vec3<f32>,
+    _padding1: f32,
+    uv: vec2<f32>,
+    _padding2: vec2<f32>,  // Explicit padding to 32 bytes
+}
+
+@group(0) @binding(0) var<storage, read_write> vertices: array<Vertex>;
+// Now WGSL and Rust agree: vertices[N] at offset N × 32
+```
+
+### Debugging Tips
+
+**Symptom 1**: Only first ~75% of array processed
+- Check: `struct_size_in_rust × 1.33 ≈ struct_size_wgsl_expects`
+- Example: 24 bytes × 1.33 = 32 bytes
+
+**Symptom 2**: Vertex data corrupted (wrong positions)
+- Individual fields misaligned
+- Check: `offset_in_rust == offset_in_wgsl`
+- Use debug buffer readback to inspect raw bytes
+
+**Prevention**:
+1. Always pad structs to next 16-byte multiple when used in storage buffer arrays
+2. Use `std::mem::size_of::<T>()` to verify Rust size matches expected WGSL size
+3. Write headless test that reads back ALL array elements and verifies sentinel values
+
+**Reference**: [WGSL Spec - Storage Class Layout](https://www.w3.org/TR/WGSL/#storage-class)
+
+---
+
 ## Gotchas
 
 **Gotcha 1: Noise periodicity**
