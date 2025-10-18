@@ -3,6 +3,10 @@ name = "vibesurfer"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = []
+gpu-terrain = []  # Phase 1: GPU compute terrain generation
+
 [dependencies]
 wgpu = "23"
 winit = "0.30"

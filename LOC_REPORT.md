@@ -1,6 +1,6 @@
 # Lines of Code Report
 
-**Last Updated**: 2025-10-18 15:52
+**Last Updated**: 2025-10-18 17:39
 **Tool**: [cloc](https://github.com/AlDanial/cloc) + wc
 
 ---
@@ -9,13 +9,13 @@
 
 | Metric | Rust Code | Documentation (.md) | Total |
 |--------|-----------|---------------------|-------|
-| **Lines** | 1,580 | 6,859 | 8,439 |
-| **Comments** | 395 | - | 395 |
-| **Blank Lines** | 356 | - | 356 |
-| **Total Lines** | 2,331 | 6,859 | 9,190 |
-| **Files** | 18 | 22 | 40 |
+| **Lines** | 1,755 | 7,664 | 9,419 |
+| **Comments** | 418 | - | 418 |
+| **Blank Lines** | 387 | - | 387 |
+| **Total Lines** | 2,560 | 7,664 | 10,224 |
+| **Files** | 18 | 24 | 42 |
 
-**Documentation Ratio**: 4.34 lines of docs per line of code
+**Documentation Ratio**: 4.37 lines of docs per line of code
 
 ---
 
@@ -24,10 +24,10 @@
 ```
 Language                     files          blank        comment           code
 -------------------------------------------------------------------------------
-Rust                            18            356            395           1580
-WGSL                             3             49             26            169
+Rust                            18            387            418           1755
+WGSL                             4             84             47            276
 -------------------------------------------------------------------------------
-SUM:                            21            405            421           1749
+SUM:                            22            471            465           2031
 -------------------------------------------------------------------------------
 ```
 
@@ -42,19 +42,19 @@ SUM:                            21            405            421           1749
 | `audio/synthesis.rs` | 12 | 12 | 0 | 0.0% | ✅ |
 | `audio/system.rs` | 186 | 150 | 36 | 19.4% | ✅ |
 | `camera.rs` | 278 | 196 | 82 | 29.5% | ✅ |
-| `cli.rs` | 75 | 75 | 0 | 0.0% | ✅ |
+| `cli.rs` | 88 | 88 | 0 | 0.0% | ✅ |
 | `lib.rs` | 9 | 9 | 0 | 0.0% | ✅ |
-| `main.rs` | 280 | 280 | 0 | 0.0% | ⚠️ Large |
+| `main.rs` | 326 | 326 | 0 | 0.0% | ⚠️ Large |
 | `noise.rs` | 27 | 27 | 0 | 0.0% | ✅ |
-| `ocean/mesh.rs` | 231 | 231 | 0 | 0.0% | ⚠️ Large |
+| `ocean/mesh.rs` | 236 | 236 | 0 | 0.0% | ⚠️ Large |
 | `ocean/mod.rs` | 34 | 17 | 17 | 50.0% | ✅ |
 | `ocean/system.rs` | 91 | 67 | 24 | 26.4% | ✅ |
 | `params/audio.rs` | 87 | 87 | 0 | 0.0% | ✅ |
 | `params/camera.rs` | 237 | 237 | 0 | 0.0% | ⚠️ Large |
 | `params/mod.rs` | 17 | 17 | 0 | 0.0% | ✅ |
-| `params/ocean.rs` | 84 | 84 | 0 | 0.0% | ✅ |
+| `params/ocean.rs` | 103 | 103 | 0 | 0.0% | ✅ |
 | `params/render.rs` | 79 | 79 | 0 | 0.0% | ✅ |
-| `rendering.rs` | 502 | 502 | 0 | 0.0% | ✅ (infra) |
+| `rendering.rs` | 648 | 648 | 0 | 0.0% | ✅ (infra) |
 
 **⚠️ Warning:** 3 file(s) over 200 impl lines - consider splitting for maintainability
 
@@ -65,11 +65,11 @@ SUM:                            21            405            421           1749
 | File | Lines |
 |------|-------|
 | `ARCHITECTURE.md` | 353 |
+| `CAMERA_REFACTOR.md` | 494 |
 | `CLAUDE.md` | 305 |
 | `CODE_MAP.md` | 719 |
 | `COVERAGE_REPORT.md` | 68 |
 | `FLOWFIELD.md` | 97 |
-| `HANDOFF.md` | 280 |
 | `LEARNINGS.md` | 272 |
 | `learnings/.ddd/0_compute_shaders_complete.md` | 337 |
 | `learnings/.ddd/open_questions.md` | 362 |
@@ -77,8 +77,9 @@ SUM:                            21            405            421           1749
 | `learnings/wgpu_compute_integration.md` | 736 |
 | `learnings/wgsl_compute_patterns.md` | 559 |
 | `LEXICON.md` | 84 |
-| `LOC_REPORT.md` | 112 |
+| `LOC_REPORT.md` | 113 |
 | `README.md` | 124 |
+| `REFACTOR_PLAN.md` | 381 |
 | `STUDY_PLAN.md` | 255 |
 | `toys/toy1_gpu_noise_match/.ddd/LEARNINGS.md` | 271 |
 | `toys/toy1_gpu_noise_match/.ddd/PLAN.md` | 366 |
@@ -94,7 +95,7 @@ SUM:                            21            405            421           1749
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| Docs/Code Ratio | ≥0.3 | 4.34 | ✅ Excellent |
+| Docs/Code Ratio | ≥0.3 | 4.37 | ✅ Excellent |
 | README exists | Yes | ✅ | Met |
 | ARCHITECTURE.md | Optional | ✅ | Optional |
 

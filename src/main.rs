@@ -197,18 +197,65 @@ impl App {
             camera_pos
         };
 
-        // Update ocean simulation (returns modulated parameters)
-        let (amplitude, frequency, line_width) =
-            self.ocean
-                .update(time_s, &audio_bands, effective_camera_pos);
+        // === Terrain Generation: CPU or GPU ===
+
+        #[cfg(feature = "gpu-terrain")]
+        let (amplitude, frequency, line_width, index_count) = {
+            // GPU path: Compute audio-modulated parameters
+            let amplitude = self.ocean.physics.detail_amplitude_m
+                + audio_bands.low * self.ocean.mapping.bass_to_amplitude_scale;
+            let frequency = self.ocean.physics.detail_frequency
+                + audio_bands.mid * self.ocean.mapping.mid_to_frequency_scale;
+            let line_width = self.ocean.physics.base_line_width
+                + audio_bands.high * self.ocean.mapping.high_to_glow_scale;
+
+            // Create terrain params for GPU
+            let terrain_params = vibesurfer::params::TerrainParams {
+                base_amplitude: self.ocean.physics.base_terrain_amplitude_m,
+                base_frequency: self.ocean.physics.base_terrain_frequency,
+                detail_amplitude: amplitude,
+                detail_frequency: frequency,
+                camera_pos: [
+                    effective_camera_pos.x,
+                    effective_camera_pos.y,
+                    effective_camera_pos.z,
+                ],
+                _padding1: 0.0,
+                grid_size: self.ocean.physics.grid_size as u32,
+                grid_spacing: self.ocean.physics.grid_spacing_m,
+                time: time_s * self.ocean.physics.wave_speed,
+                _padding2: 0.0,
+            };
+
+            // Dispatch GPU compute shader
+            render_system
+                .dispatch_terrain_compute(&terrain_params, self.ocean.physics.grid_size as u32);
+
+            // Use all indices (no phantom line filtering in Phase 1)
+            let index_count = self.ocean.grid.indices.len() as u32;
+
+            (amplitude, frequency, line_width, index_count)
+        };
+
+        #[cfg(not(feature = "gpu-terrain"))]
+        let (amplitude, frequency, line_width, index_count) = {
+            // CPU path: Existing ocean update
+            let (amplitude, frequency, line_width) =
+                self.ocean
+                    .update(time_s, &audio_bands, effective_camera_pos);
+
+            // Update ocean vertices and indices (filtered to remove phantom lines)
+            render_system.update_vertices(&self.ocean.grid.vertices);
+            render_system.update_indices(&self.ocean.grid.filtered_indices);
+
+            let index_count = self.ocean.grid.filtered_indices.len() as u32;
+
+            (amplitude, frequency, line_width, index_count)
+        };
 
         // Grid stays at origin - camera flies over it (no tiling, just huge grid)
         let model = Mat4::IDENTITY;
         let mvp = view_proj * model;
-
-        // Update ocean vertices and indices (filtered to remove phantom lines)
-        render_system.update_vertices(&self.ocean.grid.vertices);
-        render_system.update_indices(&self.ocean.grid.filtered_indices);
 
         // Update ocean uniforms
         let uniforms = Uniforms {
@@ -230,7 +277,6 @@ impl App {
         render_system.update_skybox_uniforms(&skybox_uniforms);
 
         // Render (and capture if recording)
-        let index_count = self.ocean.grid.filtered_indices.len() as u32;
         if let Err(e) = render_system.render(self.frame_count, index_count) {
             eprintln!("Render error: {:?}", e);
         }

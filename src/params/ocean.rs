@@ -1,5 +1,24 @@
 //! Ocean simulation physics parameters and audio-reactive mapping.
 
+use bytemuck::{Pod, Zeroable};
+
+/// GPU uniform buffer for terrain compute shader
+/// Must match WGSL TerrainParams struct exactly (including padding)
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Pod, Zeroable)]
+pub struct TerrainParams {
+    pub base_amplitude: f32,
+    pub base_frequency: f32,
+    pub detail_amplitude: f32,
+    pub detail_frequency: f32,
+    pub camera_pos: [f32; 3],
+    pub _padding1: f32, // Align camera_pos to 16 bytes
+    pub grid_size: u32,
+    pub grid_spacing: f32,
+    pub time: f32,
+    pub _padding2: f32,
+}
+
 /// Ocean simulation physics parameters
 #[derive(Debug, Clone)]
 pub struct OceanPhysics {

@@ -42,6 +42,14 @@ pub struct RenderSystem {
     skybox_bind_group: wgpu::BindGroup,
     recording_config: Option<RecordingConfig>,
     window_size: (u32, u32),
+
+    // GPU compute terrain generation (Phase 1)
+    #[cfg(feature = "gpu-terrain")]
+    compute_pipeline: wgpu::ComputePipeline,
+    #[cfg(feature = "gpu-terrain")]
+    compute_bind_group: wgpu::BindGroup,
+    #[cfg(feature = "gpu-terrain")]
+    terrain_params_buffer: wgpu::Buffer,
 }
 
 impl RenderSystem {
@@ -129,10 +137,19 @@ impl RenderSystem {
         });
 
         // Create buffers
+        #[cfg(feature = "gpu-terrain")]
+        let vertex_buffer_usage = wgpu::BufferUsages::VERTEX
+            | wgpu::BufferUsages::STORAGE  // GPU compute writes to this
+            | wgpu::BufferUsages::COPY_DST
+            | wgpu::BufferUsages::COPY_SRC; // For physics readback (Phase 2)
+
+        #[cfg(not(feature = "gpu-terrain"))]
+        let vertex_buffer_usage = wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST;
+
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
             contents: bytemuck::cast_slice(&ocean_grid.vertices),
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            usage: vertex_buffer_usage,
         });
 
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -204,7 +221,7 @@ impl RenderSystem {
                             format: wgpu::VertexFormat::Float32x3,
                         },
                         wgpu::VertexAttribute {
-                            offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                            offset: 16, // After position (12 bytes) + padding (4 bytes)
                             shader_location: 1,
                             format: wgpu::VertexFormat::Float32x2,
                         },
@@ -316,6 +333,93 @@ impl RenderSystem {
             cache: None,
         });
 
+        // === GPU Compute Pipeline (Phase 1) ===
+
+        #[cfg(feature = "gpu-terrain")]
+        let (compute_pipeline, compute_bind_group, terrain_params_buffer) = {
+            use crate::params::TerrainParams;
+
+            // Load compute shader
+            let compute_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("Terrain Compute Shader"),
+                source: wgpu::ShaderSource::Wgsl(include_str!("terrain_compute.wgsl").into()),
+            });
+
+            // Create terrain params uniform buffer
+            let terrain_params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("Terrain Params Buffer"),
+                size: std::mem::size_of::<TerrainParams>() as u64,
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+
+            // Create compute bind group layout
+            let compute_bind_group_layout =
+                device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("Compute Bind Group Layout"),
+                    entries: &[
+                        // Vertex buffer (storage, read-write)
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::COMPUTE,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Storage { read_only: false },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                        // Terrain params (uniform)
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::COMPUTE,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        },
+                    ],
+                });
+
+            // Create compute bind group
+            let compute_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("Compute Bind Group"),
+                layout: &compute_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: vertex_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: terrain_params_buffer.as_entire_binding(),
+                    },
+                ],
+            });
+
+            // Create compute pipeline
+            let compute_pipeline_layout =
+                device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: Some("Compute Pipeline Layout"),
+                    bind_group_layouts: &[&compute_bind_group_layout],
+                    push_constant_ranges: &[],
+                });
+
+            let compute_pipeline =
+                device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                    label: Some("Terrain Compute Pipeline"),
+                    layout: Some(&compute_pipeline_layout),
+                    module: &compute_shader,
+                    entry_point: Some("main"),
+                    compilation_options: Default::default(),
+                    cache: None,
+                });
+
+            (compute_pipeline, compute_bind_group, terrain_params_buffer)
+        };
+
         Ok(Self {
             surface,
             device,
@@ -330,6 +434,13 @@ impl RenderSystem {
             skybox_bind_group,
             recording_config,
             window_size,
+
+            #[cfg(feature = "gpu-terrain")]
+            compute_pipeline,
+            #[cfg(feature = "gpu-terrain")]
+            compute_bind_group,
+            #[cfg(feature = "gpu-terrain")]
+            terrain_params_buffer,
         })
     }
 
@@ -358,6 +469,41 @@ impl RenderSystem {
             0,
             bytemuck::cast_slice(&[*uniforms]),
         );
+    }
+
+    /// Dispatch GPU compute shader to generate terrain (Phase 1)
+    #[cfg(feature = "gpu-terrain")]
+    pub fn dispatch_terrain_compute(&self, params: &crate::params::TerrainParams, grid_size: u32) {
+        // Update terrain params uniform
+        self.queue.write_buffer(
+            &self.terrain_params_buffer,
+            0,
+            bytemuck::cast_slice(&[*params]),
+        );
+
+        // Create command encoder
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Terrain Compute Encoder"),
+            });
+
+        {
+            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("Terrain Compute Pass"),
+                timestamp_writes: None,
+            });
+
+            compute_pass.set_pipeline(&self.compute_pipeline);
+            compute_pass.set_bind_group(0, &self.compute_bind_group, &[]);
+
+            // Dispatch compute shader (workgroup_size = 256)
+            let vertex_count = grid_size * grid_size;
+            let workgroup_count = (vertex_count + 255) / 256;
+            compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
+        }
+
+        self.queue.submit(std::iter::once(encoder.finish()));
     }
 
     /// Render a frame (and optionally capture if recording)

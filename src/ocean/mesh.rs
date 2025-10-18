@@ -7,11 +7,14 @@ use crate::noise::NoiseGenerator;
 use crate::params::OceanPhysics;
 
 /// Vertex data for ocean mesh (position + UV coordinates)
+/// Must match WGSL Vertex struct exactly (including padding for storage buffer alignment)
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct Vertex {
     pub position: [f32; 3],
+    pub _padding1: f32, // Align position to 16 bytes
     pub uv: [f32; 2],
+    pub _padding2: [f32; 2], // Pad to 32 bytes total for WGSL storage array alignment
 }
 
 /// Ocean grid mesh with procedural noise animation
@@ -49,7 +52,9 @@ impl OceanGrid {
 
                 vertices.push(Vertex {
                     position: [x_pos, 0.0, z_pos],
+                    _padding1: 0.0,
                     uv: [x as f32 / grid_size as f32, z as f32 / grid_size as f32],
+                    _padding2: [0.0, 0.0],
                 });
             }
         }

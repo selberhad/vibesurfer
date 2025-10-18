@@ -69,6 +69,19 @@ impl Args {
                 .expect("Failed to create frames directory");
             std::fs::create_dir_all(&config.output_dir).expect("Failed to create output directory");
 
+            // Clean up old recording files
+            if let Ok(entries) = std::fs::read_dir(&config.frames_dir()) {
+                for entry in entries.flatten() {
+                    if entry.path().extension().map_or(false, |ext| ext == "png") {
+                        let _ = std::fs::remove_file(entry.path());
+                    }
+                }
+            }
+
+            // Remove old audio and video files
+            let _ = std::fs::remove_file(config.audio_path());
+            let _ = std::fs::remove_file(format!("{}/output.mp4", config.output_dir));
+
             config
         })
     }

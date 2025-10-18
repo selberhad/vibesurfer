@@ -10,7 +10,7 @@ use crate::params::{AudioReactiveMapping, OceanPhysics};
 pub struct OceanSystem {
     pub grid: OceanGrid,
     pub physics: OceanPhysics,
-    mapping: AudioReactiveMapping,
+    pub mapping: AudioReactiveMapping,
 }
 
 impl OceanSystem {
