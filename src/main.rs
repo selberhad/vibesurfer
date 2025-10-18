@@ -189,13 +189,9 @@ impl App {
             self.camera
                 .create_view_proj_matrix(time_s, &self.render_config, Some(terrain_fn));
 
-        // For fixed/floating camera, use simulated velocity to flow grid
-        let effective_camera_pos = if let Some(sim_vel) = self.camera.get_simulated_velocity(time_s)
-        {
-            camera_pos + sim_vel * time_s
-        } else {
-            camera_pos
-        };
+        // TODO(Phase B): Remove this - cameras now move through world space
+        // For now, just use camera_pos directly
+        let effective_camera_pos = camera_pos;
 
         // === Terrain Generation: CPU or GPU ===
 
@@ -293,16 +289,10 @@ impl App {
             self.last_fps_frame_count = self.frame_count;
 
             if let Some(ref window) = self.window {
-                // Calculate current velocity for floating camera
-                let velocity_info = if let Some(vel) = self.camera.get_simulated_velocity(time_s) {
-                    format!(" | Velocity: {:.0} m/s", vel.z)
-                } else {
-                    String::new()
-                };
-
+                // TODO(Phase B): Add velocity display back using camera position delta
                 window.set_title(&format!(
-                    "Vibesurfer - Audio-Reactive Ocean | {:.0} FPS{}",
-                    self.fps, velocity_info
+                    "Vibesurfer - Audio-Reactive Ocean | {:.0} FPS",
+                    self.fps
                 ));
             }
         }

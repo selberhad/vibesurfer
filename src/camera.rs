@@ -39,76 +39,61 @@ impl CameraSystem {
         match &self.preset {
             CameraPreset::Cinematic(params) => Self::compute_cinematic_path(params, time_s),
             CameraPreset::Basic(params) => Self::compute_basic_path(params, time_s),
-            CameraPreset::Fixed(params) => Self::compute_fixed_path(params),
+            CameraPreset::Fixed(params) => Self::compute_fixed_path(params, time_s),
             CameraPreset::Floating(params) => {
                 if let Some(ref get_height) = terrain_height_fn {
                     Self::compute_floating_path(params, time_s, get_height)
                 } else {
                     // Fallback if no terrain query available
-                    Self::compute_fixed_path(&FixedCamera::default())
+                    Self::compute_fixed_path(&FixedCamera::default(), time_s)
                 }
             }
         }
     }
 
-    /// Compute fixed camera path (stationary view, simulated motion for grid flow)
-    fn compute_fixed_path(p: &FixedCamera) -> (Vec3, Vec3) {
-        let eye = Vec3::from_array(p.position);
-        let target = Vec3::from_array(p.target);
+    /// Compute fixed camera path (moves forward at constant velocity)
+    fn compute_fixed_path(p: &FixedCamera, time_s: f32) -> (Vec3, Vec3) {
+        // Camera moves forward through world space
+        let eye = Vec3::new(
+            p.position[0],                 // X: stays constant
+            p.position[1],                 // Y: stays at elevation
+            time_s * p.simulated_velocity, // Z: moves forward
+        );
+
+        // Target moves with camera, maintaining relative offset
+        let target_offset = Vec3::from_array(p.target) - Vec3::from_array(p.position);
+        let target = eye + target_offset;
+
         (eye, target)
     }
 
-    /// Compute floating camera path (follows terrain contour)
-    ///
-    /// Note: Camera stays at origin, grid flows backward via simulated_velocity.
-    /// We query terrain at "virtual" position (simulated motion) to get height.
+    /// Compute floating camera path (follows terrain contour, actually moves through world)
     fn compute_floating_path<F>(p: &FloatingCamera, time_s: f32, get_height: F) -> (Vec3, Vec3)
     where
         F: Fn(f32, f32) -> f32,
     {
-        // Camera stays at origin (grid flows instead)
-        let x = p.position_xz[0];
-        let z = p.position_xz[1];
-
-        // Calculate velocity with acceleration: v = v0 + at
-        // Distance traveled: s = v0*t + 0.5*a*t²
+        // Calculate distance traveled with acceleration: s = v0*t + 0.5*a*t²
         let distance = p.initial_velocity * time_s + 0.5 * p.acceleration * time_s * time_s;
 
-        // Query terrain at the "virtual" forward position (where camera would be if moving)
-        let virtual_z = z + distance;
-        let terrain_height = get_height(x, virtual_z);
+        // Camera position in world space (actually moves forward)
+        let x = p.position_xz[0];
+        let z = p.position_xz[1] + distance;
+
+        // Query terrain at camera's actual position
+        let terrain_height = get_height(x, z);
         let y = terrain_height + p.height_above_terrain_m;
 
         let eye = Vec3::new(x, y, z);
 
-        // Look ahead and query terrain height at target position
+        // Look-at target (also in world space, ahead of camera)
         let target_x = x;
         let target_z = z + p.look_ahead_m;
-        let virtual_target_z = virtual_z + p.look_ahead_m;
-        let target_terrain_height = get_height(target_x, virtual_target_z);
+        let target_terrain_height = get_height(target_x, target_z);
         let target_y = target_terrain_height + p.height_above_terrain_m * 0.6; // Look slightly down
 
         let target = Vec3::new(target_x, target_y, target_z);
 
         (eye, target)
-    }
-
-    /// Get simulated velocity for fixed/floating cameras (used to flow grid)
-    ///
-    /// For floating camera with acceleration, this returns instantaneous velocity at time_s
-    pub fn get_simulated_velocity(&self, time_s: f32) -> Option<Vec3> {
-        match &self.preset {
-            CameraPreset::Fixed(params) => {
-                // Flow grid forward (positive Z direction)
-                Some(Vec3::new(0.0, 0.0, params.simulated_velocity))
-            }
-            CameraPreset::Floating(params) => {
-                // Calculate current velocity: v = v0 + at
-                let velocity = params.initial_velocity + params.acceleration * time_s;
-                Some(Vec3::new(0.0, 0.0, velocity))
-            }
-            _ => None,
-        }
     }
 
     /// Compute cinematic camera path (complex procedural motion)

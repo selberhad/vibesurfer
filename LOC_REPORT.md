@@ -1,6 +1,6 @@
 # Lines of Code Report
 
-**Last Updated**: 2025-10-18 17:39
+**Last Updated**: 2025-10-18 17:48
 **Tool**: [cloc](https://github.com/AlDanial/cloc) + wc
 
 ---
@@ -9,13 +9,13 @@
 
 | Metric | Rust Code | Documentation (.md) | Total |
 |--------|-----------|---------------------|-------|
-| **Lines** | 1,755 | 7,664 | 9,419 |
-| **Comments** | 418 | - | 418 |
+| **Lines** | 1,736 | 7,656 | 9,392 |
+| **Comments** | 412 | - | 412 |
 | **Blank Lines** | 387 | - | 387 |
-| **Total Lines** | 2,560 | 7,664 | 10,224 |
+| **Total Lines** | 2,535 | 7,656 | 10,191 |
 | **Files** | 18 | 24 | 42 |
 
-**Documentation Ratio**: 4.37 lines of docs per line of code
+**Documentation Ratio**: 4.41 lines of docs per line of code
 
 ---
 
@@ -24,10 +24,10 @@
 ```
 Language                     files          blank        comment           code
 -------------------------------------------------------------------------------
-Rust                            18            387            418           1755
+Rust                            18            387            412           1736
 WGSL                             4             84             47            276
 -------------------------------------------------------------------------------
-SUM:                            22            471            465           2031
+SUM:                            22            471            459           2012
 -------------------------------------------------------------------------------
 ```
 
@@ -41,10 +41,10 @@ SUM:                            22            471            465           2031
 | `audio/mod.rs` | 11 | 11 | 0 | 0.0% | ✅ |
 | `audio/synthesis.rs` | 12 | 12 | 0 | 0.0% | ✅ |
 | `audio/system.rs` | 186 | 150 | 36 | 19.4% | ✅ |
-| `camera.rs` | 278 | 196 | 82 | 29.5% | ✅ |
+| `camera.rs` | 263 | 181 | 82 | 31.2% | ✅ |
 | `cli.rs` | 88 | 88 | 0 | 0.0% | ✅ |
 | `lib.rs` | 9 | 9 | 0 | 0.0% | ✅ |
-| `main.rs` | 326 | 326 | 0 | 0.0% | ⚠️ Large |
+| `main.rs` | 316 | 316 | 0 | 0.0% | ⚠️ Large |
 | `noise.rs` | 27 | 27 | 0 | 0.0% | ✅ |
 | `ocean/mesh.rs` | 236 | 236 | 0 | 0.0% | ⚠️ Large |
 | `ocean/mod.rs` | 34 | 17 | 17 | 50.0% | ✅ |
@@ -65,7 +65,7 @@ SUM:                            22            471            465           2031
 | File | Lines |
 |------|-------|
 | `ARCHITECTURE.md` | 353 |
-| `CAMERA_REFACTOR.md` | 494 |
+| `CAMERA_REFACTOR.md` | 475 |
 | `CLAUDE.md` | 305 |
 | `CODE_MAP.md` | 719 |
 | `COVERAGE_REPORT.md` | 68 |
@@ -77,9 +77,9 @@ SUM:                            22            471            465           2031
 | `learnings/wgpu_compute_integration.md` | 736 |
 | `learnings/wgsl_compute_patterns.md` | 559 |
 | `LEXICON.md` | 84 |
-| `LOC_REPORT.md` | 113 |
+| `LOC_REPORT.md` | 114 |
 | `README.md` | 124 |
-| `REFACTOR_PLAN.md` | 381 |
+| `REFACTOR_PLAN.md` | 391 |
 | `STUDY_PLAN.md` | 255 |
 | `toys/toy1_gpu_noise_match/.ddd/LEARNINGS.md` | 271 |
 | `toys/toy1_gpu_noise_match/.ddd/PLAN.md` | 366 |
@@ -95,7 +95,7 @@ SUM:                            22            471            465           2031
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| Docs/Code Ratio | ≥0.3 | 4.37 | ✅ Excellent |
+| Docs/Code Ratio | ≥0.3 | 4.41 | ✅ Excellent |
 | README exists | Yes | ✅ | Met |
 | ARCHITECTURE.md | Optional | ✅ | Optional |
 
