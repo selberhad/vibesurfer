@@ -1,6 +1,6 @@
 # Lines of Code Report
 
-**Last Updated**: 2025-10-18 13:40
+**Last Updated**: 2025-10-18 13:46
 **Tool**: [cloc](https://github.com/AlDanial/cloc) + wc
 
 ---
@@ -9,13 +9,13 @@
 
 | Metric | Rust Code | Documentation (.md) | Total |
 |--------|-----------|---------------------|-------|
-| **Lines** | 1,580 | 6,463 | 8,043 |
+| **Lines** | 1,580 | 6,578 | 8,158 |
 | **Comments** | 395 | - | 395 |
 | **Blank Lines** | 356 | - | 356 |
-| **Total Lines** | 2,331 | 6,463 | 8,794 |
+| **Total Lines** | 2,331 | 6,578 | 8,909 |
 | **Files** | 18 | 21 | 39 |
 
-**Documentation Ratio**: 4.09 lines of docs per line of code
+**Documentation Ratio**: 4.16 lines of docs per line of code
 
 ---
 
@@ -71,10 +71,10 @@ SUM:                            21            405            421           1749
 | `FLOWFIELD.md` | 97 |
 | `LEARNINGS.md` | 272 |
 | `learnings/.ddd/0_compute_shaders_complete.md` | 337 |
-| `learnings/.ddd/open_questions.md` | 348 |
+| `learnings/.ddd/open_questions.md` | 362 |
 | `learnings/gpu_compute_fundamentals.md` | 330 |
 | `learnings/wgpu_compute_integration.md` | 736 |
-| `learnings/wgsl_compute_patterns.md` | 458 |
+| `learnings/wgsl_compute_patterns.md` | 559 |
 | `LEXICON.md` | 84 |
 | `LOC_REPORT.md` | 111 |
 | `README.md` | 124 |
@@ -92,7 +92,7 @@ SUM:                            21            405            421           1749
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| Docs/Code Ratio | ≥0.3 | 4.09 | ✅ Excellent |
+| Docs/Code Ratio | ≥0.3 | 4.16 | ✅ Excellent |
 | README exists | Yes | ✅ | Met |
 | ARCHITECTURE.md | Optional | ✅ | Optional |
 

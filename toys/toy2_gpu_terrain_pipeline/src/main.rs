@@ -145,7 +145,7 @@ impl App {
 
     async fn new(window: Arc<Window>) -> Self {
         let size = window.inner_size();
-        let grid_size = 10u32; // Tiny grid for debugging
+        let grid_size = 1024u32; // Production scale: 1,048,576 vertices
         let vertex_count = grid_size * grid_size;
 
         // Initialize wgpu
