@@ -421,6 +421,14 @@ impl App {
         // Update camera position based on velocity
         self.camera.update();
 
+        // Log torus wrapping (every 1024m)
+        if self.camera.position[2] > 0.0 && (self.camera.position[2] as u32) % 1024 < 10 {
+            println!(
+                "Camera at z = {:.1}m (torus wrap at 1024m intervals)",
+                self.camera.position[2]
+            );
+        }
+
         // Update camera matrix (only needs to update on window resize, but doing each frame is fine)
         let aspect = self.size.width as f32 / self.size.height as f32;
         let view_proj = create_perspective_view_proj_matrix(aspect);
