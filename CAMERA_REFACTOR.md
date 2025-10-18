@@ -2,8 +2,10 @@
 
 **Goal**: Eliminate "grid flowing" simulation and make all cameras move through actual world space, compatible with GPU terrain generation.
 
-**Status**: Planning phase
-**Related**: REFACTOR_PLAN.md (GPU terrain Phase 1 complete)
+**Status**: Ready to implement
+**Related**: REFACTOR_PLAN.md (GPU terrain Phase 1 complete, Phase 2 blocked on this)
+
+**Note**: CPU terrain generation is being removed. This refactor makes all cameras move through world space, compatible with GPU-only terrain generation.
 
 ---
 
@@ -304,11 +306,11 @@ let world_z = (params.camera_pos.z + grid_z) % WORLD_SIZE;
 **Tasks**:
 1. Remove `effective_camera_pos` calculation
 2. Update GPU path to use `camera_pos` directly
-3. Update CPU path to use `camera_pos` directly (remove effective_camera_pos)
+3. Remove CPU terrain generation fallback (delete `#[cfg(not(feature = "gpu-terrain"))]` branch)
 
 **Validation**:
 - GPU mode: Terrain should stay stable beyond 20 seconds
-- CPU mode: May be broken temporarily (grid not flowing)
+- No compilation errors
 
 ### Phase C: Update GPU Shader (1 session)
 
@@ -322,17 +324,7 @@ let world_z = (params.camera_pos.z + grid_z) % WORLD_SIZE;
 - Terrain scrolls smoothly as camera moves
 - No visible seams or discontinuities
 
-### Phase D: Update CPU Ocean System (1 session)
-
-**Tasks**:
-1. Refactor `OceanGrid::update()` to recenter grid around camera
-2. Decide: Keep vertex flowing optimization, or recompute like GPU?
-3. Update noise sampling to use world coordinates
-
-**Validation**:
-- CPU mode renders correctly
-- Fixed/Floating cameras work as expected
-- Basic/Cinematic cameras unchanged
+**Note**: Phase D (Update CPU Ocean System) has been removed. We are going GPU-only for terrain generation. CPU will only read back GPU-generated heights for physics queries (implemented in REFACTOR_PLAN.md Phase 2).
 
 ---
 
@@ -380,14 +372,9 @@ let world_z = (params.camera_pos.z + grid_z) % WORLD_SIZE;
 
 ## Known Risks
 
-### 1. CPU Performance Regression
+### 1. ~~CPU Performance Regression~~ (N/A - removing CPU mode)
 
-**Risk**: Removing vertex flowing optimization forces CPU to recompute base terrain every frame.
-
-**Mitigation**:
-- Phase D: Keep base terrain caching if needed
-- Or: Accept degradation (CPU mode is already 10× slower than GPU)
-- Or: Encourage GPU-only mode (make it default)
+**Removed**: We are going GPU-only. No CPU terrain generation to optimize.
 
 ### 2. World Coordinate Precision Loss
 
@@ -434,11 +421,6 @@ let world_z = (params.camera_pos.z + grid_z) % WORLD_SIZE;
 - [ ] 60+ second recordings show stable terrain
 - [ ] No degeneration artifacts
 
-**Phase D (CPU Ocean)**:
-- [ ] CPU mode renders correctly
-- [ ] All camera presets work
-- [ ] Performance acceptable (or document as "use GPU mode")
-
 **Overall**:
 - [ ] Fixed camera: 60s recording, stable terrain
 - [ ] All presets: 30s recording, correct motion
@@ -468,11 +450,10 @@ let world_z = (params.camera_pos.z + grid_z) % WORLD_SIZE;
 
 1. **Review this plan** with human for approval/modifications
 2. **Phase A**: Update camera system
-3. **Phase B**: Update main loop
+3. **Phase B**: Update main loop (remove CPU terrain generation)
 4. **Phase C**: Update GPU shader
-5. **Phase D**: Update CPU ocean system (if keeping CPU mode)
 
-**Estimated timeline**: 4 sessions (1 per phase)
+**Estimated timeline**: 3 sessions (1 per phase)
 
 **Blocking dependency**: None (can start immediately)
 

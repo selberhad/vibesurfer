@@ -2,8 +2,15 @@
 
 **Goal**: Move terrain generation from CPU to GPU compute shaders, validated by toy2 performance results (115 FPS at 1024×1024 grid, 2× target).
 
-**Status**: Planning phase
+**Status**: Phase 1 complete, blocked on camera refactor
 **Estimated effort**: 3-4 sessions (incremental, reversible)
+
+**Progress**:
+- ✅ Phase 1 complete (10× FPS improvement: 12-15 → 120 FPS)
+- ⏸️ Phase 2 blocked (requires camera stability fix)
+- ⏸️ Phase 3 blocked (depends on Phase 2)
+
+**Next**: See CAMERA_REFACTOR.md for camera system fixes needed to unblock Phase 2
 
 ---
 
@@ -312,11 +319,12 @@ Each phase is independently reversible:
 
 ## Success Criteria
 
-### Phase 1 (GPU Pipeline)
-- [ ] Shader compiles without validation errors
-- [ ] Terrain renders correctly in GPU mode
-- [ ] FPS improves by 50%+ (target: 90+ FPS)
-- [ ] Can toggle between CPU and GPU with feature flag
+### Phase 1 (GPU Pipeline) ✅ COMPLETE
+- [x] Shader compiles without validation errors
+- [x] Terrain renders correctly in GPU mode
+- [x] FPS improves by 50%+ (achieved: 10× improvement, 120 FPS)
+- [x] Can toggle between CPU and GPU with feature flag
+- ⚠️ Known issue: Terrain degenerates after 20s (camera position accumulation bug)
 
 ### Phase 2 (Physics)
 - [ ] Ball collision works with GPU terrain (1-frame lag acceptable)
@@ -373,9 +381,11 @@ Each phase is independently reversible:
 
 ## Next Steps
 
-1. **Review this plan** with human for approval/modifications
-2. **Phase 1**: Implement GPU compute pipeline with feature flag
-3. **Phase 2**: Add physics readback (if Phase 1 successful)
-4. **Phase 3**: Remove CPU path, optimize (if Phase 2 successful)
+1. ✅ **Phase 1**: Implement GPU compute pipeline with feature flag - COMPLETE
+2. ⏭️ **Camera Refactor**: Fix terrain degeneration bug (see CAMERA_REFACTOR.md)
+3. 🔜 **Phase 2**: Add physics readback (after camera stable)
+4. 🔜 **Phase 3**: Remove CPU fallback, make GPU default
 
-**Estimated timeline**: 3-4 sessions total (each phase ~1 session, with buffer for debugging)
+**Blockers**: Phase 2 requires stable camera system (CAMERA_REFACTOR.md Phases A, B, C)
+
+**Note**: CPU terrain generation will be removed entirely in Phase 3. GPU is the single source of truth; CPU only reads back heights for physics queries.
