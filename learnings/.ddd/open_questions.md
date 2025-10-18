@@ -1,8 +1,9 @@
 # Open Questions — GPU Compute Shaders (Vibesurfer)
 
 **Created**: 2025-10-17
+**Updated**: 2025-10-18 (added Q5.4 - storage buffer alignment discovery)
 **Purpose**: Central tracking from Research phase (GPU compute shader study)
-**Status**: 12 answered, 8 open, 20 total
+**Status**: 13 answered, 8 open, 21 total
 
 ---
 
@@ -22,7 +23,7 @@
 2. Visual Quality (2 open, 0 answered)
 3. Architecture (2 open, 0 answered)
 4. Execution Model (0 open, 3 answered)
-5. Memory (0 open, 3 answered)
+5. Memory (0 open, 4 answered) ← **NEW: Q5.4 storage buffer alignment**
 6. Integration (0 open, 3 answered)
 7. Correctness (0 open, 3 answered)
 
@@ -181,6 +182,19 @@
   - Potential use: Cache gradient table for Perlin noise (if we upgrade)
   - Related: Q2.1 (gradient noise upgrade)
 - **Next step**: Skip shared memory for hash-based noise
+
+### ✅ Storage Buffer Array Alignment (CRITICAL DISCOVERY)
+**Q5.4**: What's the actual struct size requirement for storage buffer arrays?
+- ✅ **ANSWERED**: Must pad to **next 16-byte multiple**, discovered via silent buffer overflow
+  - Source: `learnings/wgsl_compute_patterns.md` (WGSL Storage Buffer Alignment section)
+  - Bug found in toy2: 24-byte Vertex struct → WGSL expected 32 bytes
+  - Result: Only 75 of 100 vertices computed, rest uninitialized
+  - Root cause: `array<MyStruct>` elements must align to 16-byte boundaries
+  - Example: 24-byte struct → pad to 32 bytes (next multiple of 16)
+  - **Prevention**: Always pad structs in storage arrays to next 16-byte multiple
+  - **Validation**: Use headless test with sentinel values to verify ALL elements written
+- **Next step**: Apply 32-byte Vertex padding to main ocean mesh code
+- **Commit**: `fix/toy2-wgsl-alignment` branch (toy2 fix + documentation)
 
 ---
 

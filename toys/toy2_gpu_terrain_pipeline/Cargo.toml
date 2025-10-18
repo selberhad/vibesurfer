@@ -3,6 +3,10 @@ name = "toy2_gpu_terrain_pipeline"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "toy2_gpu_terrain_pipeline"
+path = "src/lib.rs"
+
 [dependencies]
 wgpu = "22.1"
 winit = "0.30"
@@ -10,7 +14,13 @@ pollster = "0.3"
 bytemuck = { version = "1.14", features = ["derive"] }
 env_logger = "0.11"
 log = "0.4"
+image = "0.25"
+glam = "0.29"
 
 [[bin]]
 name = "toy2"
 path = "src/main.rs"
+
+[[bin]]
+name = "test_render"
+path = "src/test_render.rs"

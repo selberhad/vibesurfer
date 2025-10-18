@@ -3,7 +3,9 @@
 
 struct Vertex {
     position: vec3<f32>,
+    _padding1: f32,  // Align position to 16 bytes
     uv: vec2<f32>,
+    _padding2: vec2<f32>,  // Pad struct to 32 bytes total for array alignment
 }
 
 struct TerrainParams {
@@ -12,7 +14,7 @@ struct TerrainParams {
     detail_amplitude: f32,    // audio-modulated detail height
     detail_frequency: f32,    // audio-modulated choppiness
     camera_pos: vec3<f32>,    // world-space camera position
-    _padding1: f32,           // Align vec3 to 16 bytes
+    _padding1: f32,           // Align camera_pos to 16 bytes
     grid_size: u32,           // vertices per side (512 or 1024)
     grid_spacing: f32,        // meters between vertices (2.0)
     time: f32,                // seconds (for animation)
@@ -127,11 +129,17 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let grid_x = f32(x) * params.grid_spacing;
     let grid_z = f32(z) * params.grid_spacing;
 
-    // Calculate world-space position
-    // Note: Toroidal wrapping disabled for toy - creates phantom lines
-    // Main codebase uses grid-flow approach instead
-    var world_x = grid_x;
-    var world_z = grid_z;
+    // Calculate world-space position (grid pos - camera offset for toroidal wrapping)
+    let grid_extent = f32(grid_size) * params.grid_spacing;
+    let wrap_threshold = params.camera_pos.z - grid_extent * 0.5;
+
+    var world_x = grid_x - params.camera_pos.x;
+    var world_z = grid_z - params.camera_pos.z;
+
+    // Toroidal wrapping: if vertex is behind camera, wrap it to the front
+    if (world_z < wrap_threshold) {
+        world_z += grid_extent;
+    }
 
     // Sample base terrain (static, large hills)
     let base_coord_x = world_x * 0.1 * params.base_frequency;
