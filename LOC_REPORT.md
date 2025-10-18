@@ -1,6 +1,6 @@
 # Lines of Code Report
 
-**Last Updated**: 2025-10-17 23:31
+**Last Updated**: 2025-10-17 23:58
 **Tool**: [cloc](https://github.com/AlDanial/cloc) + wc
 
 ---
@@ -9,13 +9,13 @@
 
 | Metric | Rust Code | Documentation (.md) | Total |
 |--------|-----------|---------------------|-------|
-| **Lines** | 1,580 | 5,280 | 6,860 |
+| **Lines** | 1,580 | 5,287 | 6,867 |
 | **Comments** | 395 | - | 395 |
 | **Blank Lines** | 356 | - | 356 |
-| **Total Lines** | 2,331 | 5,280 | 7,611 |
+| **Total Lines** | 2,331 | 5,287 | 7,618 |
 | **Files** | 18 | 18 | 36 |
 
-**Documentation Ratio**: 3.34 lines of docs per line of code
+**Documentation Ratio**: 3.35 lines of docs per line of code
 
 ---
 
@@ -76,7 +76,7 @@ SUM:                            21            405            421           1749
 | `learnings/wgpu_compute_integration.md` | 736 |
 | `learnings/wgsl_compute_patterns.md` | 458 |
 | `LEXICON.md` | 84 |
-| `LOC_REPORT.md` | 101 |
+| `LOC_REPORT.md` | 108 |
 | `README.md` | 124 |
 | `STUDY_PLAN.md` | 255 |
 | `toys/toy1_gpu_noise_match/.ddd/PLAN.md` | 366 |
@@ -89,7 +89,7 @@ SUM:                            21            405            421           1749
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| Docs/Code Ratio | ≥0.3 | 3.34 | ✅ Excellent |
+| Docs/Code Ratio | ≥0.3 | 3.35 | ✅ Excellent |
 | README exists | Yes | ✅ | Met |
 | ARCHITECTURE.md | Optional | ✅ | Optional |
 
