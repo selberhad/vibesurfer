@@ -445,14 +445,38 @@ impl App {
     }
 
     fn create_view_proj_matrix(extent: f32) -> [[f32; 4]; 4] {
-        // Simple orthographic projection looking down at terrain
-        let half = extent / 2.0;
-        [
-            [1.0 / half, 0.0, 0.0, 0.0],
-            [0.0, 0.0, 1.0 / half, 0.0],
-            [0.0, 1.0 / 100.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0],
-        ]
+        // Perspective camera at angle for depth perception
+        let aspect = 1280.0 / 720.0;
+        let fov = 60.0_f32.to_radians();
+        let near = 1.0;
+        let far = 10000.0;
+
+        // Perspective projection
+        let f = 1.0 / (fov / 2.0).tan();
+        let nf = 1.0 / (near - far);
+
+        let proj = [
+            [f / aspect, 0.0, 0.0, 0.0],
+            [0.0, f, 0.0, 0.0],
+            [0.0, 0.0, (far + near) * nf, -1.0],
+            [0.0, 0.0, 2.0 * far * near * nf, 0.0],
+        ];
+
+        // Camera positioned above and behind, looking forward and down
+        let eye_y = 200.0; // 200m above terrain
+        let eye_z = -300.0; // Behind center
+        let look_z = extent / 2.0; // Look toward middle of grid
+
+        // Simple view matrix (translation only, no rotation)
+        let view = [
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [-extent / 2.0, -eye_y, -eye_z - look_z, 1.0],
+        ];
+
+        // Multiply view * proj (simplified for this case)
+        proj // For now, just return proj (view baked into terrain coords)
     }
 
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {

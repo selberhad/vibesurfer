@@ -26,5 +26,6 @@ fn vs_main(in: VertexInput) -> VertexOutput {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return vec4<f32>(1.0, 1.0, 1.0, 1.0); // White
+    // Cyan neon wireframe
+    return vec4<f32>(0.0, 1.0, 1.0, 1.0);
 }
