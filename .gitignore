@@ -1,5 +1,6 @@
 # Rust build artifacts
 /target/
+**/target/
 Cargo.lock
 **/*.rs.bk
 *.pdb
@@ -26,3 +27,7 @@ HANDOFF.md
 
 # Research artifacts
 .webcache/
+
+# Toy outputs
+toys/**/output_*.png
+toys/**/*.lock
