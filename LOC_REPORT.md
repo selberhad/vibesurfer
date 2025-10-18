@@ -1,6 +1,6 @@
 # Lines of Code Report
 
-**Last Updated**: 2025-10-18 12:02
+**Last Updated**: 2025-10-18 12:05
 **Tool**: [cloc](https://github.com/AlDanial/cloc) + wc
 
 ---
@@ -9,10 +9,10 @@
 
 | Metric | Rust Code | Documentation (.md) | Total |
 |--------|-----------|---------------------|-------|
-| **Lines** | 1,580 | 6,461 | 8,041 |
+| **Lines** | 1,580 | 6,463 | 8,043 |
 | **Comments** | 395 | - | 395 |
 | **Blank Lines** | 356 | - | 356 |
-| **Total Lines** | 2,331 | 6,461 | 8,792 |
+| **Total Lines** | 2,331 | 6,463 | 8,794 |
 | **Files** | 18 | 21 | 39 |
 
 **Documentation Ratio**: 4.09 lines of docs per line of code
@@ -76,7 +76,7 @@ SUM:                            21            405            421           1749
 | `learnings/wgpu_compute_integration.md` | 736 |
 | `learnings/wgsl_compute_patterns.md` | 458 |
 | `LEXICON.md` | 84 |
-| `LOC_REPORT.md` | 109 |
+| `LOC_REPORT.md` | 111 |
 | `README.md` | 124 |
 | `STUDY_PLAN.md` | 255 |
 | `toys/toy1_gpu_noise_match/.ddd/LEARNINGS.md` | 271 |

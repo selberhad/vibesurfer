@@ -9,6 +9,32 @@ use winit::{
     window::{Window, WindowId},
 };
 
+// === Data Structures ===
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+struct Vertex {
+    position: [f32; 3],
+    uv: [f32; 2],
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+struct TerrainParams {
+    base_amplitude: f32,
+    base_frequency: f32,
+    grid_size: u32,
+    grid_spacing: f32,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+struct CameraUniforms {
+    view_proj: [[f32; 4]; 4],
+}
+
+// === FPS Tracker ===
+
 struct FpsTracker {
     frame_times: VecDeque<Duration>,
     last_frame: Instant,
@@ -59,12 +85,28 @@ impl FpsTracker {
     }
 }
 
+// === Main App ===
+
 struct App {
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     size: winit::dpi::PhysicalSize<u32>,
+
+    // Terrain compute resources
+    compute_pipeline: wgpu::ComputePipeline,
+    compute_bind_group: wgpu::BindGroup,
+    vertex_buffer: wgpu::Buffer,
+    terrain_params_buffer: wgpu::Buffer,
+    grid_size: u32,
+    vertex_count: u32,
+
+    // Rendering resources
+    render_pipeline: wgpu::RenderPipeline,
+    camera_buffer: wgpu::Buffer,
+    camera_bind_group: wgpu::BindGroup,
+
     fps_tracker: FpsTracker,
     window: Arc<Window>,
 }
@@ -72,6 +114,8 @@ struct App {
 impl App {
     async fn new(window: Arc<Window>) -> Self {
         let size = window.inner_size();
+        let grid_size = 512u32;
+        let vertex_count = grid_size * grid_size;
 
         // Initialize wgpu
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -116,12 +160,206 @@ impl App {
             format: surface_format,
             width: size.width,
             height: size.height,
-            present_mode: wgpu::PresentMode::Fifo, // VSync
+            present_mode: wgpu::PresentMode::Fifo,
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
         };
         surface.configure(&device, &config);
+
+        // === Create Compute Pipeline ===
+
+        let compute_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Terrain Compute Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("terrain_compute.wgsl").into()),
+        });
+
+        let compute_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Compute Bind Group Layout"),
+                entries: &[
+                    // Vertex buffer (storage, read-write)
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: false },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    // Terrain params (uniform)
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                ],
+            });
+
+        let compute_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Compute Pipeline Layout"),
+                bind_group_layouts: &[&compute_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let compute_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("Terrain Compute Pipeline"),
+            layout: Some(&compute_pipeline_layout),
+            module: &compute_shader,
+            entry_point: "main",
+            compilation_options: Default::default(),
+            cache: None,
+        });
+
+        // === Create Buffers ===
+
+        let vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Vertex Buffer"),
+            size: (vertex_count as u64) * std::mem::size_of::<Vertex>() as u64,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::VERTEX,
+            mapped_at_creation: false,
+        });
+
+        let terrain_params = TerrainParams {
+            base_amplitude: 100.0, // 100m hills
+            base_frequency: 0.003, // Long wavelengths
+            grid_size,
+            grid_spacing: 2.0, // 2m between vertices
+        };
+
+        let terrain_params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Terrain Params Buffer"),
+            size: std::mem::size_of::<TerrainParams>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        queue.write_buffer(
+            &terrain_params_buffer,
+            0,
+            bytemuck::bytes_of(&terrain_params),
+        );
+
+        let compute_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Compute Bind Group"),
+            layout: &compute_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: vertex_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: terrain_params_buffer.as_entire_binding(),
+                },
+            ],
+        });
+
+        // === Create Render Pipeline ===
+
+        let render_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Terrain Render Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("terrain_render.wgsl").into()),
+        });
+
+        // Camera uniforms
+        let camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Camera Buffer"),
+            size: std::mem::size_of::<CameraUniforms>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let camera_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Camera Bind Group Layout"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+            });
+
+        let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Camera Bind Group"),
+            layout: &camera_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: camera_buffer.as_entire_binding(),
+            }],
+        });
+
+        let render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Render Pipeline Layout"),
+                bind_group_layouts: &[&camera_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Render Pipeline"),
+            layout: Some(&render_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &render_shader,
+                entry_point: "vs_main",
+                buffers: &[wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<Vertex>() as u64,
+                    step_mode: wgpu::VertexStepMode::Vertex,
+                    attributes: &[
+                        wgpu::VertexAttribute {
+                            format: wgpu::VertexFormat::Float32x3,
+                            offset: 0,
+                            shader_location: 0,
+                        },
+                        wgpu::VertexAttribute {
+                            format: wgpu::VertexFormat::Float32x2,
+                            offset: 12,
+                            shader_location: 1,
+                        },
+                    ],
+                }],
+                compilation_options: Default::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &render_shader,
+                entry_point: "fs_main",
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: surface_format,
+                    blend: None,
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::PointList,
+                ..Default::default()
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview: None,
+            cache: None,
+        });
+
+        // Initialize camera (orthographic top-down view)
+        let view_proj = Self::create_view_proj_matrix(grid_size as f32 * 2.0);
+        queue.write_buffer(
+            &camera_buffer,
+            0,
+            bytemuck::bytes_of(&CameraUniforms { view_proj }),
+        );
 
         Self {
             surface,
@@ -129,9 +367,29 @@ impl App {
             queue,
             config,
             size,
+            compute_pipeline,
+            compute_bind_group,
+            vertex_buffer,
+            terrain_params_buffer,
+            grid_size,
+            vertex_count,
+            render_pipeline,
+            camera_buffer,
+            camera_bind_group,
             fps_tracker: FpsTracker::new(),
             window,
         }
+    }
+
+    fn create_view_proj_matrix(extent: f32) -> [[f32; 4]; 4] {
+        // Simple orthographic projection looking down at terrain
+        let half = extent / 2.0;
+        [
+            [1.0 / half, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0 / half, 0.0],
+            [0.0, 1.0 / 100.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
     }
 
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
@@ -155,8 +413,23 @@ impl App {
                 label: Some("Render Encoder"),
             });
 
+        // === Compute Pass: Generate Terrain ===
         {
-            let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("Terrain Compute Pass"),
+                timestamp_writes: None,
+            });
+
+            compute_pass.set_pipeline(&self.compute_pipeline);
+            compute_pass.set_bind_group(0, &self.compute_bind_group, &[]);
+
+            let workgroup_count = (self.vertex_count + 255) / 256;
+            compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
+        }
+
+        // === Render Pass: Draw Points ===
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
@@ -170,6 +443,11 @@ impl App {
                 occlusion_query_set: None,
                 timestamp_writes: None,
             });
+
+            render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            render_pass.draw(0..self.vertex_count, 0..1);
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
@@ -180,6 +458,8 @@ impl App {
         Ok(())
     }
 }
+
+// === Application Handler ===
 
 struct AppState {
     app: Option<App>,
