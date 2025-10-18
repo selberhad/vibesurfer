@@ -1,9 +1,9 @@
 // Headless rendering test for debugging wireframe
 use bytemuck::{Pod, Zeroable};
 
-const WIDTH: u32 = 800;
-const HEIGHT: u32 = 800;
-const GRID_SIZE: u32 = 10;
+const WIDTH: u32 = 1280;
+const HEIGHT: u32 = 720;
+const GRID_SIZE: u32 = 256; // Clear grid visualization
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
