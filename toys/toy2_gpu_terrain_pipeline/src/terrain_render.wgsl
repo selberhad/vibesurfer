@@ -26,6 +26,6 @@ fn vs_main(in: VertexInput) -> VertexOutput {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    // Color based on UV to visualize grid topology
-    return vec4<f32>(in.uv.x, in.uv.y, 0.0, 1.0);
+    // Cyan neon wireframe
+    return vec4<f32>(0.0, 1.0, 1.0, 1.0);
 }
