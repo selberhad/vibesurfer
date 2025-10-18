@@ -15,7 +15,9 @@ use winit::{
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct Vertex {
     position: [f32; 3],
+    _padding1: f32, // Align position to 16 bytes
     uv: [f32; 2],
+    _padding2: [f32; 2], // Pad to 32 bytes for WGSL storage array alignment
 }
 
 #[repr(C)]
@@ -116,21 +118,34 @@ struct App {
 impl App {
     fn generate_indices(grid_size: u32) -> Vec<u32> {
         let mut indices = Vec::new();
-        for z in 0..grid_size - 1 {
+        // Generate line segments for a wireframe grid
+        // Horizontal lines (connect vertices in same row)
+        for z in 0..grid_size {
             for x in 0..grid_size - 1 {
                 let i = z * grid_size + x;
-                // Triangle 1
-                indices.extend_from_slice(&[i, i + 1, i + grid_size]);
-                // Triangle 2
-                indices.extend_from_slice(&[i + 1, i + grid_size + 1, i + grid_size]);
+                indices.push(i);
+                indices.push(i + 1);
             }
         }
+        // Vertical lines (connect vertices in same column)
+        for z in 0..grid_size - 1 {
+            for x in 0..grid_size {
+                let i = z * grid_size + x;
+                indices.push(i);
+                indices.push(i + grid_size);
+            }
+        }
+
+        // Debug: print first few indices
+        println!("Grid size: {}, Total indices: {}", grid_size, indices.len());
+        println!("First 20 indices: {:?}", &indices[..20.min(indices.len())]);
+
         indices
     }
 
     async fn new(window: Arc<Window>) -> Self {
         let size = window.inner_size();
-        let grid_size = 512u32;
+        let grid_size = 10u32; // Tiny grid for debugging
         let vertex_count = grid_size * grid_size;
 
         // Initialize wgpu
@@ -153,7 +168,7 @@ impl App {
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
-                    required_features: wgpu::Features::empty(),
+                    required_features: wgpu::Features::POLYGON_MODE_LINE,
                     required_limits: wgpu::Limits::default(),
                     label: None,
                     memory_hints: Default::default(),
@@ -248,7 +263,7 @@ impl App {
             base_amplitude: 100.0, // 100m hills
             base_frequency: 0.003, // Long wavelengths
             grid_size,
-            grid_spacing: 2.0, // 2m between vertices
+            grid_spacing: 100.0, // 100m between vertices (very wide spacing)
         };
 
         let terrain_params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
@@ -342,7 +357,7 @@ impl App {
                         },
                         wgpu::VertexAttribute {
                             format: wgpu::VertexFormat::Float32x2,
-                            offset: 12,
+                            offset: 16, // After position (12 bytes) + padding1 (4 bytes)
                             shader_location: 1,
                         },
                     ],
@@ -360,8 +375,7 @@ impl App {
                 compilation_options: Default::default(),
             }),
             primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                polygon_mode: wgpu::PolygonMode::Line,
+                topology: wgpu::PrimitiveTopology::LineList,
                 ..Default::default()
             },
             depth_stencil: None,
@@ -371,7 +385,10 @@ impl App {
         });
 
         // Initialize camera (orthographic top-down view)
-        let view_proj = Self::create_view_proj_matrix(grid_size as f32 * 2.0);
+        let aspect = size.width as f32 / size.height as f32;
+        // Show the entire smaller grid
+        let extent = grid_size as f32 * terrain_params.grid_spacing;
+        let view_proj = Self::create_view_proj_matrix(extent, aspect);
         queue.write_buffer(
             &camera_buffer,
             0,
@@ -417,14 +434,15 @@ impl App {
         }
     }
 
-    fn create_view_proj_matrix(extent: f32) -> [[f32; 4]; 4] {
-        // Simple orthographic projection looking down at terrain
-        let half = extent / 2.0;
+    fn create_view_proj_matrix(extent: f32, _aspect: f32) -> [[f32; 4]; 4] {
+        // Simple orthographic top-down: X->clipX, Z->clipY
+        let scale = 2.0 / extent;
+
         [
-            [1.0 / half, 0.0, 0.0, 0.0],
-            [0.0, 0.0, 1.0 / half, 0.0],
-            [0.0, 1.0 / 100.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0],
+            [scale, 0.0, 0.0, 0.0], // world_x -> clip_x
+            [0.0, 0.0, 0.0, 0.0],   // ignore Y (height)
+            [0.0, scale, 0.0, 0.0], // world_z -> clip_y
+            [-1.0, -1.0, 0.0, 1.0], // center at origin
         ]
     }
 

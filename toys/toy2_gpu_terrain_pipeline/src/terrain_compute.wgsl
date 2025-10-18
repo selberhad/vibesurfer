@@ -3,7 +3,9 @@
 
 struct Vertex {
     position: vec3<f32>,
+    _padding1: f32,  // Align position to 16 bytes
     uv: vec2<f32>,
+    _padding2: vec2<f32>,  // Pad struct to 32 bytes total for array alignment
 }
 
 struct TerrainParams {
@@ -121,12 +123,8 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let world_x = f32(x) * params.grid_spacing;
     let world_z = f32(z) * params.grid_spacing;
 
-    // Sample noise at world coordinates
-    // Apply 0.1x scaling factor from toy1 learnings + base_frequency
-    let noise_coord_x = world_x * 0.1 * params.base_frequency;
-    let noise_coord_z = world_z * 0.1 * params.base_frequency;
-
-    let height = simplex3d(vec3<f32>(noise_coord_x, noise_coord_z, 0.0)) * params.base_amplitude;
+    // DEBUG: Flat terrain
+    let height = 0.0;
 
     // Write vertex data
     vertices[idx].position = vec3<f32>(world_x, height, world_z);
