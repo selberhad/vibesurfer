@@ -106,12 +106,28 @@ struct App {
     render_pipeline: wgpu::RenderPipeline,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
+    index_buffer: wgpu::Buffer,
+    index_count: u32,
 
     fps_tracker: FpsTracker,
     window: Arc<Window>,
 }
 
 impl App {
+    fn generate_indices(grid_size: u32) -> Vec<u32> {
+        let mut indices = Vec::new();
+        for z in 0..grid_size - 1 {
+            for x in 0..grid_size - 1 {
+                let i = z * grid_size + x;
+                // Triangle 1
+                indices.extend_from_slice(&[i, i + 1, i + grid_size]);
+                // Triangle 2
+                indices.extend_from_slice(&[i + 1, i + grid_size + 1, i + grid_size]);
+            }
+        }
+        indices
+    }
+
     async fn new(window: Arc<Window>) -> Self {
         let size = window.inner_size();
         let grid_size = 512u32;
@@ -344,7 +360,8 @@ impl App {
                 compilation_options: Default::default(),
             }),
             primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::PointList,
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                polygon_mode: wgpu::PolygonMode::Line,
                 ..Default::default()
             },
             depth_stencil: None,
@@ -361,6 +378,23 @@ impl App {
             bytemuck::bytes_of(&CameraUniforms { view_proj }),
         );
 
+        // Generate index buffer for wireframe triangles
+        let indices = Self::generate_indices(grid_size);
+        let index_count = indices.len() as u32;
+
+        let index_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Index Buffer"),
+            size: (index_count as u64) * std::mem::size_of::<u32>() as u64,
+            usage: wgpu::BufferUsages::INDEX,
+            mapped_at_creation: true,
+        });
+
+        {
+            let mut buffer_view = index_buffer.slice(..).get_mapped_range_mut();
+            buffer_view.copy_from_slice(bytemuck::cast_slice(&indices));
+        }
+        index_buffer.unmap();
+
         Self {
             surface,
             device,
@@ -376,6 +410,8 @@ impl App {
             render_pipeline,
             camera_buffer,
             camera_bind_group,
+            index_buffer,
+            index_count,
             fps_tracker: FpsTracker::new(),
             window,
         }
@@ -427,7 +463,7 @@ impl App {
             compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
         }
 
-        // === Render Pass: Draw Points ===
+        // === Render Pass: Draw Wireframe ===
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
@@ -447,7 +483,8 @@ impl App {
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.draw(0..self.vertex_count, 0..1);
+            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+            render_pass.draw_indexed(0..self.index_count, 0, 0..1);
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
