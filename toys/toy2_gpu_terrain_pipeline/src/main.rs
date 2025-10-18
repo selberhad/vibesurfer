@@ -219,8 +219,8 @@ impl App {
             camera_pos: [0.0, 0.0, 0.0],
             _padding1: 0.0,
             grid_size,
-            grid_spacing: 100.0, // 100m between vertices (very wide spacing)
-            time: 0.0,           // Animation time
+            grid_spacing: 2.0, // 2m between vertices (visible from 100m camera height)
+            time: 0.0,         // Animation time
             _padding2: 0.0,
         };
 
@@ -433,7 +433,7 @@ impl App {
             camera_pos: [0.0, 0.0, camera_z],
             _padding1: 0.0,
             grid_size: self.grid_size,
-            grid_spacing: 100.0, // 100m between vertices
+            grid_spacing: 2.0, // 2m between vertices
             time,
             _padding2: 0.0,
         };

@@ -31,3 +31,5 @@ HANDOFF.md
 # Toy outputs
 toys/**/output_*.png
 toys/**/*.lock
+toys/**/frame_*.png
+toys/**/debug_*.png

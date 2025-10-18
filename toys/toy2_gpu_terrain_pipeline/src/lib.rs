@@ -48,76 +48,22 @@ pub struct CameraUniforms {
 
 // === Camera Math ===
 
-pub fn create_perspective_view_proj_matrix(camera_z: f32, aspect: f32) -> [[f32; 4]; 4] {
-    // Perspective camera: hover above terrain, looking forward
-    // Camera positioned 100m above, 200m behind current position
-    let camera_pos = [0.0, 100.0, camera_z - 200.0];
-    let look_at = [0.0, 0.0, camera_z + 300.0]; // Look 300m ahead
-    let up = [0.0, 1.0, 0.0];
+pub fn create_perspective_view_proj_matrix(_camera_z: f32, _aspect: f32) -> [[f32; 4]; 4] {
+    // TEMPORARY: Use the original working orthographic projection from Step 3
+    // This is a simple top-down view (looking down Y axis)
+    let grid_size = 512;
+    let grid_spacing = 2.0;
+    let extent = grid_size as f32 * grid_spacing; // 1024m
+    let half = extent / 2.0;
 
-    // View matrix (look-at)
-    let forward = [
-        look_at[0] - camera_pos[0],
-        look_at[1] - camera_pos[1],
-        look_at[2] - camera_pos[2],
-    ];
-    let forward_len =
-        (forward[0] * forward[0] + forward[1] * forward[1] + forward[2] * forward[2]).sqrt();
-    let forward = [
-        forward[0] / forward_len,
-        forward[1] / forward_len,
-        forward[2] / forward_len,
-    ];
-
-    let right = [
-        forward[1] * up[2] - forward[2] * up[1],
-        forward[2] * up[0] - forward[0] * up[2],
-        forward[0] * up[1] - forward[1] * up[0],
-    ];
-    let right_len = (right[0] * right[0] + right[1] * right[1] + right[2] * right[2]).sqrt();
-    let right = [
-        right[0] / right_len,
-        right[1] / right_len,
-        right[2] / right_len,
-    ];
-
-    let camera_up = [
-        right[1] * forward[2] - right[2] * forward[1],
-        right[2] * forward[0] - right[0] * forward[2],
-        right[0] * forward[1] - right[1] * forward[0],
-    ];
-
-    let view = [
-        [right[0], camera_up[0], -forward[0], 0.0],
-        [right[1], camera_up[1], -forward[1], 0.0],
-        [right[2], camera_up[2], -forward[2], 0.0],
-        [
-            -(right[0] * camera_pos[0] + right[1] * camera_pos[1] + right[2] * camera_pos[2]),
-            -(camera_up[0] * camera_pos[0]
-                + camera_up[1] * camera_pos[1]
-                + camera_up[2] * camera_pos[2]),
-            -(-forward[0] * camera_pos[0]
-                + -forward[1] * camera_pos[1]
-                + -forward[2] * camera_pos[2]),
-            1.0,
-        ],
-    ];
-
-    // Perspective projection (60° FOV)
-    let fov_y = 60.0_f32.to_radians();
-    let f = 1.0 / (fov_y / 2.0).tan();
-    let near = 1.0;
-    let far = 10000.0;
-
-    let proj = [
-        [f / aspect, 0.0, 0.0, 0.0],
-        [0.0, f, 0.0, 0.0],
-        [0.0, 0.0, far / (near - far), -1.0],
-        [0.0, 0.0, (near * far) / (near - far), 0.0],
-    ];
-
-    // Combine view * proj
-    multiply_matrix_4x4(&proj, &view)
+    // Original working matrix from commit 9aad205
+    // Swaps Y and Z axes to look down from above
+    [
+        [1.0 / half, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0 / half, 0.0],
+        [0.0, 1.0 / 100.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ]
 }
 
 // === Index Generation ===

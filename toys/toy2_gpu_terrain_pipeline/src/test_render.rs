@@ -91,7 +91,7 @@ async fn render_frame(camera_z: f32) {
         camera_pos: [0.0, 0.0, camera_z],
         _padding1: 0.0,
         grid_size: GRID_SIZE,
-        grid_spacing: 100.0,
+        grid_spacing: 2.0,
         time,
         _padding2: 0.0,
     };
