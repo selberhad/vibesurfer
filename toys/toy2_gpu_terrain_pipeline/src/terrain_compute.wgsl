@@ -125,9 +125,21 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let x = idx % grid_size;
     let z = idx / grid_size;
 
-    // Calculate world-space position
-    let world_x = f32(x) * params.grid_spacing;
-    let world_z = f32(z) * params.grid_spacing;
+    // Calculate grid-local position
+    let grid_x = f32(x) * params.grid_spacing;
+    let grid_z = f32(z) * params.grid_spacing;
+
+    // Calculate world-space position (grid pos - camera offset for toroidal wrapping)
+    let grid_extent = f32(grid_size) * params.grid_spacing;
+    let wrap_threshold = params.camera_pos.z - grid_extent * 0.5;
+
+    var world_x = grid_x - params.camera_pos.x;
+    var world_z = grid_z - params.camera_pos.z;
+
+    // Toroidal wrapping: if vertex is behind camera, wrap it to the front
+    if (world_z < wrap_threshold) {
+        world_z += grid_extent;
+    }
 
     // Sample base terrain (static, large hills)
     let base_coord_x = world_x * 0.1 * params.base_frequency;
