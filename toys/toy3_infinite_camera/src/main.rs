@@ -13,6 +13,16 @@ use winit::{
     window::{Window, WindowId},
 };
 
+// === Motion Mode ===
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum MotionMode {
+    Forward,
+    Diagonal,
+    Stopped,
+    Circular,
+}
+
 // === FPS Tracker ===
 
 struct FpsTracker {
@@ -107,6 +117,8 @@ struct App {
     fps_tracker: FpsTracker,
     start_time: Instant,
     camera: CameraState,
+    motion_mode: MotionMode,
+    circle_start_time: f32,
     window: Arc<Window>,
 }
 
@@ -396,6 +408,8 @@ impl App {
             fps_tracker: FpsTracker::new(),
             start_time: Instant::now(),
             camera: CameraState::new([0.0, 0.0, 0.0], [0.0, 0.0, 10.0]),
+            motion_mode: MotionMode::Forward,
+            circle_start_time: 0.0,
             window,
         }
     }
@@ -418,8 +432,28 @@ impl App {
         let audio_mid = 3.0 + 2.0 * (time * 1.0).sin();
         let _audio_high = 2.0 + 1.0 * (time * 2.0).sin();
 
-        // Update camera position based on velocity
-        self.camera.update();
+        // Handle circular motion mode
+        if self.motion_mode == MotionMode::Circular {
+            let circle_time = time - self.circle_start_time;
+            let radius = 200.0;
+            let period = 60.0;
+            let theta = (circle_time / period) * 2.0 * std::f32::consts::PI;
+
+            // Update position directly for smooth circle
+            self.camera.position[0] = radius * theta.cos();
+            self.camera.position[2] = radius * theta.sin();
+
+            // Set velocity tangent to circle
+            let velocity_mag = 2.0 * std::f32::consts::PI * radius / period;
+            self.camera.set_velocity([
+                -velocity_mag * theta.sin(),
+                0.0,
+                velocity_mag * theta.cos(),
+            ]);
+        } else {
+            // Normal velocity-based update
+            self.camera.update();
+        }
 
         // Log torus wrapping (every 1024m)
         if self.camera.position[2] > 0.0 && (self.camera.position[2] as u32) % 1024 < 10 {
@@ -545,6 +579,52 @@ impl ApplicationHandler for AppState {
                     },
                 ..
             } => event_loop.exit(),
+            WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        state: ElementState::Pressed,
+                        physical_key: PhysicalKey::Code(code),
+                        ..
+                    },
+                ..
+            } => {
+                if let Some(app) = &mut self.app {
+                    match code {
+                        KeyCode::Digit1 => {
+                            app.motion_mode = MotionMode::Forward;
+                            app.camera.set_velocity([0.0, 0.0, 10.0]);
+                            println!("Mode: Forward (10 m/s)");
+                        }
+                        KeyCode::Digit2 => {
+                            app.motion_mode = MotionMode::Diagonal;
+                            app.camera.set_velocity([7.07, 0.0, 7.07]);
+                            println!("Mode: Diagonal northeast (~10 m/s)");
+                        }
+                        KeyCode::Space => {
+                            if app.motion_mode == MotionMode::Stopped {
+                                app.motion_mode = MotionMode::Forward;
+                                app.camera.set_velocity([0.0, 0.0, 10.0]);
+                                println!("Mode: Forward (resumed)");
+                            } else {
+                                app.motion_mode = MotionMode::Stopped;
+                                app.camera.set_velocity([0.0, 0.0, 0.0]);
+                                println!("Mode: Stopped");
+                            }
+                        }
+                        KeyCode::Digit3 => {
+                            app.motion_mode = MotionMode::Circular;
+                            app.circle_start_time = app.start_time.elapsed().as_secs_f32();
+                            println!("Mode: Circular (200m radius, 60s period)");
+                        }
+                        KeyCode::KeyP => {
+                            let (min, avg, max) = app.fps_tracker.stats();
+                            println!("=== FPS Summary ===");
+                            println!("Min: {:.1}, Avg: {:.1}, Max: {:.1}", min, avg, max);
+                        }
+                        _ => {}
+                    }
+                }
+            }
             WindowEvent::Resized(physical_size) => {
                 if let Some(app) = &mut self.app {
                     app.resize(physical_size);
