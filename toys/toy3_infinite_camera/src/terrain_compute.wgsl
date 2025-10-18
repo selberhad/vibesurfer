@@ -21,6 +21,8 @@ struct TerrainParams {
     torus_extent_x: f32,      // torus wrap distance X
     torus_extent_z: f32,      // torus wrap distance Z
     _padding2: f32,
+    _padding3: f32,
+    _padding4: vec4<f32>,     // Pad to 80 bytes total (WGSL uniform buffer alignment)
 }
 
 @group(0) @binding(0) var<storage, read_write> vertices: array<Vertex>;

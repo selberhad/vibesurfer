@@ -39,7 +39,7 @@ pub struct FixedCamera {
 impl Default for FixedCamera {
     fn default() -> Self {
         Self {
-            position: [0.0, 101.0, 0.0], // Just above tallest hills (100m amplitude)
+            position: [0.0, 101.0, 0.0], // X centered (will be offset by shader)
             target: [0.0, 0.0, 100.0],   // Looking forward and down
             simulated_velocity: 150.0,   // Same as basic preset
         }

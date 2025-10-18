@@ -29,7 +29,7 @@ impl Default for RenderConfig {
             window_height: 720,
             fov_degrees: 100.0, // Very wide FOV for extreme perspective
             near_plane_m: 0.1,
-            far_plane_m: 2000.0,
+            far_plane_m: 3000.0, // Enough for grid extent (2048m)
         }
     }
 }

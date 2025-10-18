@@ -1,6 +1,6 @@
 # Lines of Code Report
 
-**Last Updated**: 2025-10-18 19:30
+**Last Updated**: 2025-10-18 19:35
 **Tool**: [cloc](https://github.com/AlDanial/cloc) + wc
 
 ---
@@ -9,13 +9,13 @@
 
 | Metric | Rust Code | Documentation (.md) | Total |
 |--------|-----------|---------------------|-------|
-| **Lines** | 1,721 | 8,389 | 10,110 |
+| **Lines** | 1,728 | 8,389 | 10,117 |
 | **Comments** | 410 | - | 410 |
 | **Blank Lines** | 383 | - | 383 |
-| **Total Lines** | 2,514 | 8,389 | 10,903 |
+| **Total Lines** | 2,521 | 8,389 | 10,910 |
 | **Files** | 18 | 26 | 44 |
 
-**Documentation Ratio**: 4.87 lines of docs per line of code
+**Documentation Ratio**: 4.85 lines of docs per line of code
 
 ---
 
@@ -24,10 +24,10 @@
 ```
 Language                     files          blank        comment           code
 -------------------------------------------------------------------------------
-Rust                            18            383            410           1721
+Rust                            18            383            410           1728
 WGSL                             4             85             53            274
 -------------------------------------------------------------------------------
-SUM:                            22            468            463           1995
+SUM:                            22            468            463           2002
 -------------------------------------------------------------------------------
 ```
 
@@ -44,7 +44,7 @@ SUM:                            22            468            463           1995
 | `camera.rs` | 263 | 181 | 82 | 31.2% | ✅ |
 | `cli.rs` | 88 | 88 | 0 | 0.0% | ✅ |
 | `lib.rs` | 9 | 9 | 0 | 0.0% | ✅ |
-| `main.rs` | 309 | 309 | 0 | 0.0% | ⚠️ Large |
+| `main.rs` | 316 | 316 | 0 | 0.0% | ⚠️ Large |
 | `noise.rs` | 27 | 27 | 0 | 0.0% | ✅ |
 | `ocean/mesh.rs` | 236 | 236 | 0 | 0.0% | ⚠️ Large |
 | `ocean/mod.rs` | 34 | 17 | 17 | 50.0% | ✅ |
@@ -97,7 +97,7 @@ SUM:                            22            468            463           1995
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| Docs/Code Ratio | ≥0.3 | 4.87 | ✅ Excellent |
+| Docs/Code Ratio | ≥0.3 | 4.85 | ✅ Excellent |
 | README exists | Yes | ✅ | Met |
 | ARCHITECTURE.md | Optional | ✅ | Optional |
 

@@ -189,6 +189,14 @@ impl App {
             self.camera
                 .create_view_proj_matrix(time_s, &self.render_config, Some(terrain_fn));
 
+        // DEBUG: Log camera position every second
+        if self.frame_count % 60 == 0 {
+            println!(
+                "[{:.1}s] Camera: ({:.1}, {:.1}, {:.1})",
+                time_s, camera_pos.x, camera_pos.y, camera_pos.z
+            );
+        }
+
         // === Terrain Generation: GPU only ===
 
         let (amplitude, frequency, line_width, index_count) = {
@@ -214,9 +222,26 @@ impl App {
                 _padding2: 0.0,
             };
 
+            // DEBUG: Log terrain params every second
+            if self.frame_count % 60 == 0 {
+                println!(
+                    "  TerrainParams: camera_pos=({:.1}, {:.1}, {:.1}) grid_size={} spacing={:.1}",
+                    terrain_params.camera_pos[0],
+                    terrain_params.camera_pos[1],
+                    terrain_params.camera_pos[2],
+                    terrain_params.grid_size,
+                    terrain_params.grid_spacing
+                );
+                println!("  Dispatching compute shader (frame {})", self.frame_count);
+            }
+
             // Dispatch GPU compute shader
             render_system
                 .dispatch_terrain_compute(&terrain_params, self.ocean.physics.grid_size as u32);
+
+            if self.frame_count % 60 == 0 {
+                println!("  Compute shader dispatched");
+            }
 
             // Use all indices (no phantom line filtering in Phase 1)
             let index_count = self.ocean.grid.indices.len() as u32;

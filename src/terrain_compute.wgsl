@@ -126,32 +126,32 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let x = idx % grid_size;
     let z = idx / grid_size;
 
-    // Calculate grid-local position (centered at origin, matching CPU version)
+    // Grid follows camera: keep camera centered in grid
     let grid_extent = f32(grid_size) * params.grid_spacing;
-    let half_size = grid_extent * 0.5;
-    let grid_x = f32(x) * params.grid_spacing - half_size;
-    let grid_z = f32(z) * params.grid_spacing - half_size;
+    let half_extent = grid_extent * 0.5;
 
-    // Calculate world-space position (grid pos - camera offset for toroidal wrapping)
-    let wrap_threshold = params.camera_pos.z - grid_extent * 0.5;
+    // Local grid position (0 to grid_extent)
+    let local_x = f32(x) * params.grid_spacing;
+    let local_z = f32(z) * params.grid_spacing;
 
-    var world_x = grid_x - params.camera_pos.x;
-    var world_z = grid_z - params.camera_pos.z;
+    // World position: camera is at center of grid
+    // Grid spans from (camera - half_extent) to (camera + half_extent)
+    // These are ACTUAL WORLD COORDINATES that move with the camera
+    let world_x = params.camera_pos.x - half_extent + local_x;
+    let world_z = params.camera_pos.z - half_extent + local_z;
 
-    // Toroidal wrapping: if vertex is behind camera, wrap it to the front
-    // NOTE: This creates phantom lines (stretched triangles) - acceptable for Phase 1
-    if (world_z < wrap_threshold) {
-        world_z += grid_extent;
-    }
+    // For noise sampling, use the same world coordinates
+    let sample_x = world_x;
+    let sample_z = world_z;
 
-    // Sample base terrain (static, large hills for future physics)
-    let base_coord_x = world_x * params.base_frequency;
-    let base_coord_z = world_z * params.base_frequency;
+    // Sample base terrain using wrapped coordinates (creates the loop)
+    let base_coord_x = sample_x * params.base_frequency;
+    let base_coord_z = sample_z * params.base_frequency;
     let base_height = simplex3d(vec3<f32>(base_coord_x, base_coord_z, 0.0)) * params.base_amplitude;
 
     // Sample detail layer (animated, audio-reactive)
-    let detail_coord_x = world_x * params.detail_frequency;
-    let detail_coord_z = world_z * params.detail_frequency;
+    let detail_coord_x = sample_x * params.detail_frequency;
+    let detail_coord_z = sample_z * params.detail_frequency;
     let detail_height = simplex3d(vec3<f32>(detail_coord_x, detail_coord_z, params.time)) * params.detail_amplitude;
 
     // Combine layers
@@ -160,4 +160,9 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // Write vertex data
     vertices[idx].position = vec3<f32>(world_x, height, world_z);
     vertices[idx].uv = vec2<f32>(f32(x) / f32(grid_size), f32(z) / f32(grid_size));
+
+    // DEBUG: Print first vertex position periodically
+    // if (idx == 0u) {
+    //     // This won't actually print, but useful for understanding
+    // }
 }
