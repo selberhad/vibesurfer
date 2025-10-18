@@ -26,10 +26,11 @@ struct TerrainParams {
     detail_amplitude: f32,
     detail_frequency: f32,
     camera_pos: [f32; 3],
+    _padding1: f32, // Align vec3 to 16 bytes
     grid_size: u32,
     grid_spacing: f32,
     time: f32,
-    _padding: f32,
+    _padding2: f32,
 }
 
 #[repr(C)]
@@ -174,7 +175,7 @@ impl App {
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
-                    required_features: wgpu::Features::empty(),
+                    required_features: wgpu::Features::POLYGON_MODE_LINE,
                     required_limits: wgpu::Limits::default(),
                     label: None,
                     memory_hints: Default::default(),
@@ -271,10 +272,11 @@ impl App {
             detail_amplitude: 2.0, // Small ripples (will be modulated)
             detail_frequency: 0.1, // Fine detail (will be modulated)
             camera_pos: [0.0, 0.0, 0.0],
+            _padding1: 0.0,
             grid_size,
             grid_spacing: 2.0, // 2m between vertices
             time: 0.0,         // Animation time
-            _padding: 0.0,
+            _padding2: 0.0,
         };
 
         let terrain_params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
@@ -475,8 +477,14 @@ impl App {
             [-extent / 2.0, -eye_y, -eye_z - look_z, 1.0],
         ];
 
-        // Multiply view * proj (simplified for this case)
-        proj // For now, just return proj (view baked into terrain coords)
+        // Simple orthographic top-down - perspective wasn't working
+        let half = extent / 2.0;
+        [
+            [1.0 / half, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0 / half, 0.0],
+            [0.0, -1.0 / 500.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
     }
 
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
@@ -508,10 +516,11 @@ impl App {
             detail_amplitude: 2.0 + audio_low * 3.0, // Bass modulates amplitude
             detail_frequency: 0.1 + audio_mid * 0.15, // Mids modulate frequency
             camera_pos: [0.0, 0.0, camera_z],
+            _padding1: 0.0,
             grid_size: self.grid_size,
             grid_spacing: 2.0,
             time,
-            _padding: 0.0,
+            _padding2: 0.0,
         };
 
         self.queue.write_buffer(

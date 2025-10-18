@@ -1,6 +1,6 @@
 # Lines of Code Report
 
-**Last Updated**: 2025-10-18 12:15
+**Last Updated**: 2025-10-18 12:38
 **Tool**: [cloc](https://github.com/AlDanial/cloc) + wc
 
 ---
@@ -9,13 +9,13 @@
 
 | Metric | Rust Code | Documentation (.md) | Total |
 |--------|-----------|---------------------|-------|
-| **Lines** | 1,580 | 6,463 | 8,043 |
+| **Lines** | 1,580 | 6,672 | 8,252 |
 | **Comments** | 395 | - | 395 |
 | **Blank Lines** | 356 | - | 356 |
-| **Total Lines** | 2,331 | 6,463 | 8,794 |
-| **Files** | 18 | 21 | 39 |
+| **Total Lines** | 2,331 | 6,672 | 9,003 |
+| **Files** | 18 | 22 | 40 |
 
-**Documentation Ratio**: 4.09 lines of docs per line of code
+**Documentation Ratio**: 4.22 lines of docs per line of code
 
 ---
 
@@ -82,6 +82,7 @@ SUM:                            21            405            421           1749
 | `toys/toy1_gpu_noise_match/.ddd/LEARNINGS.md` | 271 |
 | `toys/toy1_gpu_noise_match/.ddd/PLAN.md` | 366 |
 | `toys/toy1_gpu_noise_match/.ddd/SPEC.md` | 277 |
+| `toys/toy2_gpu_terrain_pipeline/.ddd/LEARNINGS.md` | 209 |
 | `toys/toy2_gpu_terrain_pipeline/.ddd/PLAN.md` | 553 |
 | `toys/toy2_gpu_terrain_pipeline/.ddd/SPEC.md` | 349 |
 | `VISION.md` | 50 |
@@ -92,7 +93,7 @@ SUM:                            21            405            421           1749
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| Docs/Code Ratio | ≥0.3 | 4.09 | ✅ Excellent |
+| Docs/Code Ratio | ≥0.3 | 4.22 | ✅ Excellent |
 | README exists | Yes | ✅ | Met |
 | ARCHITECTURE.md | Optional | ✅ | Optional |
 
