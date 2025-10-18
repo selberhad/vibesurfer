@@ -1,6 +1,6 @@
 # Lines of Code Report
 
-**Last Updated**: 2025-10-18 17:51
+**Last Updated**: 2025-10-18 19:27
 **Tool**: [cloc](https://github.com/AlDanial/cloc) + wc
 
 ---
@@ -9,13 +9,13 @@
 
 | Metric | Rust Code | Documentation (.md) | Total |
 |--------|-----------|---------------------|-------|
-| **Lines** | 1,708 | 7,656 | 9,364 |
-| **Comments** | 408 | - | 408 |
-| **Blank Lines** | 380 | - | 380 |
-| **Total Lines** | 2,496 | 7,656 | 10,152 |
-| **Files** | 18 | 24 | 42 |
+| **Lines** | 1,721 | 8,387 | 10,108 |
+| **Comments** | 410 | - | 410 |
+| **Blank Lines** | 383 | - | 383 |
+| **Total Lines** | 2,514 | 8,387 | 10,901 |
+| **Files** | 18 | 26 | 44 |
 
-**Documentation Ratio**: 4.48 lines of docs per line of code
+**Documentation Ratio**: 4.87 lines of docs per line of code
 
 ---
 
@@ -24,10 +24,10 @@
 ```
 Language                     files          blank        comment           code
 -------------------------------------------------------------------------------
-Rust                            18            380            408           1708
-WGSL                             4             84             47            276
+Rust                            18            383            410           1721
+WGSL                             4             85             53            274
 -------------------------------------------------------------------------------
-SUM:                            22            464            455           1984
+SUM:                            22            468            463           1995
 -------------------------------------------------------------------------------
 ```
 
@@ -44,7 +44,7 @@ SUM:                            22            464            455           1984
 | `camera.rs` | 263 | 181 | 82 | 31.2% | ✅ |
 | `cli.rs` | 88 | 88 | 0 | 0.0% | ✅ |
 | `lib.rs` | 9 | 9 | 0 | 0.0% | ✅ |
-| `main.rs` | 291 | 291 | 0 | 0.0% | ⚠️ Large |
+| `main.rs` | 309 | 309 | 0 | 0.0% | ⚠️ Large |
 | `noise.rs` | 27 | 27 | 0 | 0.0% | ✅ |
 | `ocean/mesh.rs` | 236 | 236 | 0 | 0.0% | ⚠️ Large |
 | `ocean/mod.rs` | 34 | 17 | 17 | 50.0% | ✅ |
@@ -87,6 +87,8 @@ SUM:                            22            464            455           1984
 | `toys/toy2_gpu_terrain_pipeline/.ddd/LEARNINGS.md` | 209 |
 | `toys/toy2_gpu_terrain_pipeline/.ddd/PLAN.md` | 553 |
 | `toys/toy2_gpu_terrain_pipeline/.ddd/SPEC.md` | 349 |
+| `toys/toy3_infinite_camera/.ddd/PLAN.md` | 384 |
+| `toys/toy3_infinite_camera/.ddd/SPEC.md` | 347 |
 | `VISION.md` | 50 |
 
 ---
@@ -95,7 +97,7 @@ SUM:                            22            464            455           1984
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| Docs/Code Ratio | ≥0.3 | 4.48 | ✅ Excellent |
+| Docs/Code Ratio | ≥0.3 | 4.87 | ✅ Excellent |
 | README exists | Yes | ✅ | Met |
 | ARCHITECTURE.md | Optional | ✅ | Optional |
 
