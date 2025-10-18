@@ -1,6 +1,6 @@
 # Lines of Code Report
 
-**Last Updated**: 2025-10-18 17:48
+**Last Updated**: 2025-10-18 17:51
 **Tool**: [cloc](https://github.com/AlDanial/cloc) + wc
 
 ---
@@ -9,13 +9,13 @@
 
 | Metric | Rust Code | Documentation (.md) | Total |
 |--------|-----------|---------------------|-------|
-| **Lines** | 1,736 | 7,656 | 9,392 |
-| **Comments** | 412 | - | 412 |
-| **Blank Lines** | 387 | - | 387 |
-| **Total Lines** | 2,535 | 7,656 | 10,191 |
+| **Lines** | 1,708 | 7,656 | 9,364 |
+| **Comments** | 408 | - | 408 |
+| **Blank Lines** | 380 | - | 380 |
+| **Total Lines** | 2,496 | 7,656 | 10,152 |
 | **Files** | 18 | 24 | 42 |
 
-**Documentation Ratio**: 4.41 lines of docs per line of code
+**Documentation Ratio**: 4.48 lines of docs per line of code
 
 ---
 
@@ -24,10 +24,10 @@
 ```
 Language                     files          blank        comment           code
 -------------------------------------------------------------------------------
-Rust                            18            387            412           1736
+Rust                            18            380            408           1708
 WGSL                             4             84             47            276
 -------------------------------------------------------------------------------
-SUM:                            22            471            459           2012
+SUM:                            22            464            455           1984
 -------------------------------------------------------------------------------
 ```
 
@@ -44,7 +44,7 @@ SUM:                            22            471            459           2012
 | `camera.rs` | 263 | 181 | 82 | 31.2% | ✅ |
 | `cli.rs` | 88 | 88 | 0 | 0.0% | ✅ |
 | `lib.rs` | 9 | 9 | 0 | 0.0% | ✅ |
-| `main.rs` | 316 | 316 | 0 | 0.0% | ⚠️ Large |
+| `main.rs` | 291 | 291 | 0 | 0.0% | ⚠️ Large |
 | `noise.rs` | 27 | 27 | 0 | 0.0% | ✅ |
 | `ocean/mesh.rs` | 236 | 236 | 0 | 0.0% | ⚠️ Large |
 | `ocean/mod.rs` | 34 | 17 | 17 | 50.0% | ✅ |
@@ -54,7 +54,7 @@ SUM:                            22            471            459           2012
 | `params/mod.rs` | 17 | 17 | 0 | 0.0% | ✅ |
 | `params/ocean.rs` | 103 | 103 | 0 | 0.0% | ✅ |
 | `params/render.rs` | 79 | 79 | 0 | 0.0% | ✅ |
-| `rendering.rs` | 648 | 648 | 0 | 0.0% | ✅ (infra) |
+| `rendering.rs` | 634 | 634 | 0 | 0.0% | ✅ (infra) |
 
 **⚠️ Warning:** 3 file(s) over 200 impl lines - consider splitting for maintainability
 
@@ -95,7 +95,7 @@ SUM:                            22            471            459           2012
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| Docs/Code Ratio | ≥0.3 | 4.41 | ✅ Excellent |
+| Docs/Code Ratio | ≥0.3 | 4.48 | ✅ Excellent |
 | README exists | Yes | ✅ | Met |
 | ARCHITECTURE.md | Optional | ✅ | Optional |
 

@@ -189,13 +189,8 @@ impl App {
             self.camera
                 .create_view_proj_matrix(time_s, &self.render_config, Some(terrain_fn));
 
-        // TODO(Phase B): Remove this - cameras now move through world space
-        // For now, just use camera_pos directly
-        let effective_camera_pos = camera_pos;
+        // === Terrain Generation: GPU only ===
 
-        // === Terrain Generation: CPU or GPU ===
-
-        #[cfg(feature = "gpu-terrain")]
         let (amplitude, frequency, line_width, index_count) = {
             // GPU path: Compute audio-modulated parameters
             let amplitude = self.ocean.physics.detail_amplitude_m
@@ -205,17 +200,13 @@ impl App {
             let line_width = self.ocean.physics.base_line_width
                 + audio_bands.high * self.ocean.mapping.high_to_glow_scale;
 
-            // Create terrain params for GPU
+            // Create terrain params for GPU (camera at actual world position)
             let terrain_params = vibesurfer::params::TerrainParams {
                 base_amplitude: self.ocean.physics.base_terrain_amplitude_m,
                 base_frequency: self.ocean.physics.base_terrain_frequency,
                 detail_amplitude: amplitude,
                 detail_frequency: frequency,
-                camera_pos: [
-                    effective_camera_pos.x,
-                    effective_camera_pos.y,
-                    effective_camera_pos.z,
-                ],
+                camera_pos: [camera_pos.x, camera_pos.y, camera_pos.z],
                 _padding1: 0.0,
                 grid_size: self.ocean.physics.grid_size as u32,
                 grid_spacing: self.ocean.physics.grid_spacing_m,
@@ -233,23 +224,7 @@ impl App {
             (amplitude, frequency, line_width, index_count)
         };
 
-        #[cfg(not(feature = "gpu-terrain"))]
-        let (amplitude, frequency, line_width, index_count) = {
-            // CPU path: Existing ocean update
-            let (amplitude, frequency, line_width) =
-                self.ocean
-                    .update(time_s, &audio_bands, effective_camera_pos);
-
-            // Update ocean vertices and indices (filtered to remove phantom lines)
-            render_system.update_vertices(&self.ocean.grid.vertices);
-            render_system.update_indices(&self.ocean.grid.filtered_indices);
-
-            let index_count = self.ocean.grid.filtered_indices.len() as u32;
-
-            (amplitude, frequency, line_width, index_count)
-        };
-
-        // Grid stays at origin - camera flies over it (no tiling, just huge grid)
+        // Grid is local window around camera (camera moves through world space)
         let model = Mat4::IDENTITY;
         let mvp = view_proj * model;
 

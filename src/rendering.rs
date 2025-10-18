@@ -43,12 +43,9 @@ pub struct RenderSystem {
     recording_config: Option<RecordingConfig>,
     window_size: (u32, u32),
 
-    // GPU compute terrain generation (Phase 1)
-    #[cfg(feature = "gpu-terrain")]
+    // GPU compute terrain generation
     compute_pipeline: wgpu::ComputePipeline,
-    #[cfg(feature = "gpu-terrain")]
     compute_bind_group: wgpu::BindGroup,
-    #[cfg(feature = "gpu-terrain")]
     terrain_params_buffer: wgpu::Buffer,
 }
 
@@ -137,19 +134,13 @@ impl RenderSystem {
         });
 
         // Create buffers
-        #[cfg(feature = "gpu-terrain")]
-        let vertex_buffer_usage = wgpu::BufferUsages::VERTEX
-            | wgpu::BufferUsages::STORAGE  // GPU compute writes to this
-            | wgpu::BufferUsages::COPY_DST
-            | wgpu::BufferUsages::COPY_SRC; // For physics readback (Phase 2)
-
-        #[cfg(not(feature = "gpu-terrain"))]
-        let vertex_buffer_usage = wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST;
-
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
             contents: bytemuck::cast_slice(&ocean_grid.vertices),
-            usage: vertex_buffer_usage,
+            usage: wgpu::BufferUsages::VERTEX
+                | wgpu::BufferUsages::STORAGE  // GPU compute writes to this
+                | wgpu::BufferUsages::COPY_DST
+                | wgpu::BufferUsages::COPY_SRC, // For physics readback (future)
         });
 
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -333,9 +324,8 @@ impl RenderSystem {
             cache: None,
         });
 
-        // === GPU Compute Pipeline (Phase 1) ===
+        // === GPU Compute Pipeline ===
 
-        #[cfg(feature = "gpu-terrain")]
         let (compute_pipeline, compute_bind_group, terrain_params_buffer) = {
             use crate::params::TerrainParams;
 
@@ -435,11 +425,8 @@ impl RenderSystem {
             recording_config,
             window_size,
 
-            #[cfg(feature = "gpu-terrain")]
             compute_pipeline,
-            #[cfg(feature = "gpu-terrain")]
             compute_bind_group,
-            #[cfg(feature = "gpu-terrain")]
             terrain_params_buffer,
         })
     }
@@ -471,8 +458,7 @@ impl RenderSystem {
         );
     }
 
-    /// Dispatch GPU compute shader to generate terrain (Phase 1)
-    #[cfg(feature = "gpu-terrain")]
+    /// Dispatch GPU compute shader to generate terrain
     pub fn dispatch_terrain_compute(&self, params: &crate::params::TerrainParams, grid_size: u32) {
         // Update terrain params uniform
         self.queue.write_buffer(
