@@ -11,6 +11,7 @@ struct TerrainParams {
     base_frequency: f32,      // cycles/meter (e.g., 0.003)
     detail_amplitude: f32,    // audio-modulated detail height
     detail_frequency: f32,    // audio-modulated choppiness
+    camera_pos: vec3<f32>,    // world-space camera position
     grid_size: u32,           // vertices per side (512 or 1024)
     grid_spacing: f32,        // meters between vertices (2.0)
     time: f32,                // seconds (for animation)

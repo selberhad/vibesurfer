@@ -25,6 +25,7 @@ struct TerrainParams {
     base_frequency: f32,
     detail_amplitude: f32,
     detail_frequency: f32,
+    camera_pos: [f32; 3],
     grid_size: u32,
     grid_spacing: f32,
     time: f32,
@@ -254,6 +255,7 @@ impl App {
             base_frequency: 0.003, // Long wavelengths
             detail_amplitude: 2.0, // Small ripples (will be modulated)
             detail_frequency: 0.1, // Fine detail (will be modulated)
+            camera_pos: [0.0, 0.0, 0.0],
             grid_size,
             grid_spacing: 2.0, // 2m between vertices
             time: 0.0,         // Animation time
@@ -456,12 +458,17 @@ impl App {
         let audio_mid = 3.0 + 2.0 * (time * 1.0).sin();
         let _audio_high = 2.0 + 1.0 * (time * 2.0).sin();
 
+        // Camera moves forward at 10 m/s
+        let camera_speed = 10.0;
+        let camera_z = time * camera_speed;
+
         // Update terrain parameters with audio modulation
         let terrain_params = TerrainParams {
             base_amplitude: 100.0,
             base_frequency: 0.003,
             detail_amplitude: 2.0 + audio_low * 3.0, // Bass modulates amplitude
             detail_frequency: 0.1 + audio_mid * 0.15, // Mids modulate frequency
+            camera_pos: [0.0, 0.0, camera_z],
             grid_size: self.grid_size,
             grid_spacing: 2.0,
             time,
