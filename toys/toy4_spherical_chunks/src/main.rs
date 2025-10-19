@@ -1,17 +1,49 @@
 use std::sync::Arc;
 use winit::{
-    event::{Event, KeyEvent, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
+    application::ApplicationHandler,
+    event::{KeyEvent, WindowEvent},
+    event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
     keyboard::{KeyCode, PhysicalKey},
+    window::{Window, WindowId},
 };
 
 // === Configuration ===
 
 const PLANET_RADIUS: f32 = 1_000_000.0; // 1000km radius
-const CHUNK_SIZE: u32 = 256; // 256x256 vertices per chunk
+const DEFAULT_CHUNK_SIZE: u32 = 256; // 256x256 vertices per chunk
 const DEFAULT_ALTITUDE: f32 = 100.0; // 100m above surface
 const DEFAULT_SPEED: f32 = 100.0; // 100 m/s tangential velocity
 const DEFAULT_SPACING: f32 = 2.0; // 2m between vertices
+
+// === Data Structures ===
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+struct Vertex {
+    position: [f32; 3],
+    _padding1: f32,
+    uv: [f32; 2],
+    _padding2: [f32; 2],
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+struct SphereParams {
+    planet_radius: f32,
+    chunk_center_lat: f32,
+    chunk_center_lon: f32,
+    grid_size: u32,
+    grid_spacing: f32,
+    _padding1: f32,
+    _padding2: f32,
+    _padding3: f32,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+struct CameraUniforms {
+    view_proj: [[f32; 4]; 4],
+}
 
 // === Orbital Camera ===
 
@@ -43,18 +75,18 @@ impl OrbitCamera {
         }
     }
 
-    fn position(&self) -> [f32; 3] {
+    fn position(&self) -> glam::Vec3 {
         // Equatorial orbit (latitude = 0)
         let r = PLANET_RADIUS + self.altitude;
         let lat: f32 = 0.0;
         let lon = self.angular_pos;
 
         // Spherical to Cartesian
-        [
+        glam::Vec3::new(
             r * lat.cos() * lon.cos(),
             r * lat.sin(),
             r * lat.cos() * lon.sin(),
-        ]
+        )
     }
 
     fn adjust_altitude(&mut self, delta: f32) {
@@ -72,52 +104,385 @@ impl OrbitCamera {
         self.angular_velocity = new_speed / (PLANET_RADIUS + self.altitude);
         println!("Orbital speed: {:.1} m/s", new_speed);
     }
-}
 
-// === Chunk System ===
+    fn view_proj_matrix(&self, aspect_ratio: f32) -> [[f32; 4]; 4] {
+        let pos = self.position();
 
-#[derive(Debug, Hash, Eq, PartialEq, Copy, Clone)]
-struct ChunkId {
-    lat_cell: i32,
-    lon_cell: i32,
-}
+        // Chunk is centered at lat=0, lon=0 on the sphere surface
+        // Look at a point on the sphere surface in that direction
+        let chunk_center = glam::Vec3::new(PLANET_RADIUS, 0.0, 0.0);
 
-impl ChunkId {
-    fn from_position(position: [f32; 3], chunk_size_radians: f32) -> Self {
-        // Convert XYZ to lat/lon
-        let x = position[0];
-        let y = position[1];
-        let z = position[2];
+        let view = glam::Mat4::look_at_rh(pos, chunk_center, glam::Vec3::Y);
+        let proj = glam::Mat4::perspective_rh(
+            60.0_f32.to_radians(),
+            aspect_ratio,
+            1.0,
+            2_000_000.0, // Far plane beyond planet radius
+        );
 
-        let r = (x * x + y * y + z * z).sqrt();
-        let lat = (y / r).asin();
-        let lon = z.atan2(x);
-
-        ChunkId {
-            lat_cell: (lat / chunk_size_radians).floor() as i32,
-            lon_cell: (lon / chunk_size_radians).floor() as i32,
-        }
+        (proj * view).to_cols_array_2d()
     }
 }
 
-// === App State ===
+// === Helper Functions ===
+
+fn generate_grid_indices(grid_size: u32) -> Vec<u32> {
+    let mut indices = Vec::new();
+
+    for z in 0..grid_size - 1 {
+        for x in 0..grid_size - 1 {
+            let top_left = z * grid_size + x;
+            let top_right = top_left + 1;
+            let bottom_left = (z + 1) * grid_size + x;
+            let bottom_right = bottom_left + 1;
+
+            // Two triangles per quad
+            indices.push(top_left);
+            indices.push(bottom_left);
+            indices.push(bottom_left);
+            indices.push(bottom_right);
+            indices.push(bottom_right);
+            indices.push(top_right);
+            indices.push(top_right);
+            indices.push(top_left);
+        }
+    }
+
+    indices
+}
+
+// === Main App ===
 
 struct App {
+    surface: wgpu::Surface<'static>,
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    config: wgpu::SurfaceConfiguration,
+    size: winit::dpi::PhysicalSize<u32>,
+
+    // Compute resources
+    compute_pipeline: wgpu::ComputePipeline,
+    compute_bind_group: wgpu::BindGroup,
+    vertex_buffer: wgpu::Buffer,
+    sphere_params_buffer: wgpu::Buffer,
+
+    // Render resources
+    render_pipeline: wgpu::RenderPipeline,
+    camera_buffer: wgpu::Buffer,
+    camera_bind_group: wgpu::BindGroup,
+    index_buffer: wgpu::Buffer,
+    index_count: u32,
+
     camera: OrbitCamera,
     grid_spacing: f32,
+    chunk_size: u32,
     last_frame: std::time::Instant,
     frame_count: u32,
     fps_timer: std::time::Instant,
+    window: Arc<Window>,
 }
 
 impl App {
-    fn new() -> Self {
-        Self {
-            camera: OrbitCamera::new(DEFAULT_ALTITUDE, DEFAULT_SPEED),
+    async fn new(window: Arc<Window>, chunk_size: u32) -> Self {
+        let size = window.inner_size();
+        let vertex_count = chunk_size * chunk_size;
+
+        // Initialize wgpu
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::all(),
+            ..Default::default()
+        });
+
+        let surface = instance.create_surface(window.clone()).unwrap();
+
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                compatible_surface: Some(&surface),
+                force_fallback_adapter: false,
+            })
+            .await
+            .unwrap();
+
+        let (device, queue) = adapter
+            .request_device(
+                &wgpu::DeviceDescriptor {
+                    label: Some("Device"),
+                    required_features: wgpu::Features::empty(),
+                    required_limits: wgpu::Limits::default(),
+                    memory_hints: wgpu::MemoryHints::Performance,
+                },
+                None,
+            )
+            .await
+            .unwrap();
+
+        let surface_caps = surface.get_capabilities(&adapter);
+        let surface_format = surface_caps
+            .formats
+            .iter()
+            .copied()
+            .find(|f| f.is_srgb())
+            .unwrap_or(surface_caps.formats[0]);
+
+        let config = wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format: surface_format,
+            width: size.width,
+            height: size.height,
+            present_mode: wgpu::PresentMode::Fifo,
+            alpha_mode: surface_caps.alpha_modes[0],
+            view_formats: vec![],
+            desired_maximum_frame_latency: 2,
+        };
+        surface.configure(&device, &config);
+
+        // Create vertex buffer (storage buffer for compute shader)
+        let vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Vertex Buffer"),
+            size: (vertex_count as u64) * std::mem::size_of::<Vertex>() as u64,
+            usage: wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::VERTEX
+                | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        // Create sphere params buffer
+        let sphere_params = SphereParams {
+            planet_radius: PLANET_RADIUS,
+            chunk_center_lat: 0.0,
+            chunk_center_lon: 0.0,
+            grid_size: chunk_size,
             grid_spacing: DEFAULT_SPACING,
+            _padding1: 0.0,
+            _padding2: 0.0,
+            _padding3: 0.0,
+        };
+
+        let sphere_params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Sphere Params Buffer"),
+            size: std::mem::size_of::<SphereParams>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        queue.write_buffer(&sphere_params_buffer, 0, bytemuck::bytes_of(&sphere_params));
+
+        // Create compute pipeline
+        let compute_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Compute Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("sphere_compute.wgsl").into()),
+        });
+
+        let compute_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Compute Bind Group Layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: false },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                ],
+            });
+
+        let compute_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Compute Bind Group"),
+            layout: &compute_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: vertex_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: sphere_params_buffer.as_entire_binding(),
+                },
+            ],
+        });
+
+        let compute_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Compute Pipeline Layout"),
+                bind_group_layouts: &[&compute_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let compute_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("Compute Pipeline"),
+            layout: Some(&compute_pipeline_layout),
+            module: &compute_shader,
+            entry_point: "main",
+            compilation_options: Default::default(),
+            cache: Default::default(),
+        });
+
+        // Create camera buffer
+        let camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Camera Buffer"),
+            size: std::mem::size_of::<CameraUniforms>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        // Create render pipeline
+        let render_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Render Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("sphere_render.wgsl").into()),
+        });
+
+        let camera_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Camera Bind Group Layout"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+            });
+
+        let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Camera Bind Group"),
+            layout: &camera_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: camera_buffer.as_entire_binding(),
+            }],
+        });
+
+        let render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Render Pipeline Layout"),
+                bind_group_layouts: &[&camera_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Render Pipeline"),
+            layout: Some(&render_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &render_shader,
+                entry_point: "vs_main",
+                buffers: &[wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<Vertex>() as u64,
+                    step_mode: wgpu::VertexStepMode::Vertex,
+                    attributes: &[
+                        wgpu::VertexAttribute {
+                            offset: 0,
+                            shader_location: 0,
+                            format: wgpu::VertexFormat::Float32x3,
+                        },
+                        wgpu::VertexAttribute {
+                            offset: 16, // After position + padding
+                            shader_location: 1,
+                            format: wgpu::VertexFormat::Float32x2,
+                        },
+                    ],
+                }],
+                compilation_options: Default::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &render_shader,
+                entry_point: "fs_main",
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: config.format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::LineList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: None,
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            multiview: None,
+            cache: None,
+        });
+
+        // Generate indices for wireframe
+        let indices = generate_grid_indices(chunk_size);
+        let index_count = indices.len() as u32;
+
+        let index_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Index Buffer"),
+            size: (indices.len() * std::mem::size_of::<u32>()) as u64,
+            usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        queue.write_buffer(&index_buffer, 0, bytemuck::cast_slice(&indices));
+
+        // Run initial compute pass
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Init Compute Encoder"),
+        });
+
+        {
+            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("Init Compute Pass"),
+                timestamp_writes: None,
+            });
+            compute_pass.set_pipeline(&compute_pipeline);
+            compute_pass.set_bind_group(0, &compute_bind_group, &[]);
+            let workgroup_count = (vertex_count + 255) / 256;
+            compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
+        }
+
+        queue.submit(std::iter::once(encoder.finish()));
+
+        let camera = OrbitCamera::new(DEFAULT_ALTITUDE, DEFAULT_SPEED);
+
+        Self {
+            surface,
+            device,
+            queue,
+            config,
+            size,
+            compute_pipeline,
+            compute_bind_group,
+            vertex_buffer,
+            sphere_params_buffer,
+            render_pipeline,
+            camera_buffer,
+            camera_bind_group,
+            index_buffer,
+            index_count,
+            camera,
+            grid_spacing: DEFAULT_SPACING,
+            chunk_size,
             last_frame: std::time::Instant::now(),
             frame_count: 0,
             fps_timer: std::time::Instant::now(),
+            window,
         }
     }
 
@@ -128,13 +493,106 @@ impl App {
 
         self.camera.update(dt);
 
+        // Update chunk to follow camera longitude
+        let sphere_params = SphereParams {
+            planet_radius: PLANET_RADIUS,
+            chunk_center_lat: 0.0,
+            chunk_center_lon: self.camera.angular_pos,
+            grid_size: self.chunk_size,
+            grid_spacing: self.grid_spacing,
+            _padding1: 0.0,
+            _padding2: 0.0,
+            _padding3: 0.0,
+        };
+        self.queue.write_buffer(
+            &self.sphere_params_buffer,
+            0,
+            bytemuck::bytes_of(&sphere_params),
+        );
+
+        // Re-run compute shader
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Update Chunk Encoder"),
+            });
+
+        {
+            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("Update Chunk Pass"),
+                timestamp_writes: None,
+            });
+            compute_pass.set_pipeline(&self.compute_pipeline);
+            compute_pass.set_bind_group(0, &self.compute_bind_group, &[]);
+            let workgroup_count = (self.chunk_size * self.chunk_size + 255) / 256;
+            compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
+        }
+
+        self.queue.submit(std::iter::once(encoder.finish()));
+
         // FPS counter
         self.frame_count += 1;
         if (now - self.fps_timer).as_secs() >= 1 {
-            println!("FPS: {}", self.frame_count);
+            println!(
+                "FPS: {} | Vertices: {} | Spacing: {:.2}m",
+                self.frame_count,
+                self.chunk_size * self.chunk_size,
+                self.grid_spacing
+            );
             self.frame_count = 0;
             self.fps_timer = now;
         }
+    }
+
+    fn render(&mut self) {
+        // Update camera uniform
+        let aspect_ratio = self.size.width as f32 / self.size.height as f32;
+        let view_proj = self.camera.view_proj_matrix(aspect_ratio);
+        let camera_uniforms = CameraUniforms { view_proj };
+        self.queue
+            .write_buffer(&self.camera_buffer, 0, bytemuck::bytes_of(&camera_uniforms));
+
+        let output = self.surface.get_current_texture().unwrap();
+        let view = output
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Render Encoder"),
+            });
+
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.0,
+                            g: 0.0,
+                            b: 0.0,
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+
+            render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+            render_pass.draw_indexed(0..self.index_count, 0, 0..1);
+        }
+
+        self.queue.submit(std::iter::once(encoder.finish()));
+        output.present();
     }
 
     fn handle_input(&mut self, keycode: KeyCode) {
@@ -146,10 +604,12 @@ impl App {
             KeyCode::Digit5 => {
                 self.grid_spacing = (self.grid_spacing * 0.5).max(0.25);
                 println!("Grid spacing: {:.2}m", self.grid_spacing);
+                self.update_sphere_params();
             }
             KeyCode::Digit6 => {
                 self.grid_spacing = (self.grid_spacing * 2.0).min(10.0);
                 println!("Grid spacing: {:.2}m", self.grid_spacing);
+                self.update_sphere_params();
             }
             KeyCode::Space => {
                 self.camera.paused = !self.camera.paused;
@@ -166,10 +626,116 @@ impl App {
                 let pos = self.camera.position();
                 println!(
                     "Camera: altitude={:.1}m, pos=[{:.1}, {:.1}, {:.1}], angle={:.3}rad",
-                    self.camera.altitude, pos[0], pos[1], pos[2], self.camera.angular_pos
+                    self.camera.altitude, pos.x, pos.y, pos.z, self.camera.angular_pos
                 );
             }
             _ => {}
+        }
+    }
+
+    fn update_sphere_params(&mut self) {
+        let sphere_params = SphereParams {
+            planet_radius: PLANET_RADIUS,
+            chunk_center_lat: 0.0,
+            chunk_center_lon: 0.0,
+            grid_size: self.chunk_size,
+            grid_spacing: self.grid_spacing,
+            _padding1: 0.0,
+            _padding2: 0.0,
+            _padding3: 0.0,
+        };
+        self.queue.write_buffer(
+            &self.sphere_params_buffer,
+            0,
+            bytemuck::bytes_of(&sphere_params),
+        );
+
+        // Re-run compute shader
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Update Compute Encoder"),
+            });
+
+        {
+            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("Update Compute Pass"),
+                timestamp_writes: None,
+            });
+            compute_pass.set_pipeline(&self.compute_pipeline);
+            compute_pass.set_bind_group(0, &self.compute_bind_group, &[]);
+            let workgroup_count = (self.chunk_size * self.chunk_size + 255) / 256;
+            compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
+        }
+
+        self.queue.submit(std::iter::once(encoder.finish()));
+    }
+
+    fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+        if new_size.width > 0 && new_size.height > 0 {
+            self.size = new_size;
+            self.config.width = new_size.width;
+            self.config.height = new_size.height;
+            self.surface.configure(&self.device, &self.config);
+        }
+    }
+}
+
+// === Event Handler ===
+
+struct AppHandler {
+    app: Option<App>,
+    chunk_size: u32,
+}
+
+impl ApplicationHandler for AppHandler {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        if self.app.is_some() {
+            return;
+        }
+
+        let window_attrs = Window::default_attributes()
+            .with_title("Toy 4: Spherical Chunk Streaming")
+            .with_inner_size(winit::dpi::PhysicalSize::new(1280, 720));
+
+        let window = Arc::new(event_loop.create_window(window_attrs).unwrap());
+        let app = pollster::block_on(App::new(window, self.chunk_size));
+        self.app = Some(app);
+    }
+
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+        let Some(app) = &mut self.app else {
+            return;
+        };
+
+        match event {
+            WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::Resized(physical_size) => {
+                app.resize(physical_size);
+            }
+            WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        physical_key: PhysicalKey::Code(keycode),
+                        state: winit::event::ElementState::Pressed,
+                        ..
+                    },
+                ..
+            } => {
+                app.handle_input(keycode);
+            }
+            WindowEvent::RedrawRequested => {
+                app.update();
+                app.render();
+                app.window.request_redraw();
+            }
+            _ => {}
+        }
+    }
+
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+        if let Some(app) = &self.app {
+            app.window.request_redraw();
         }
     }
 }
@@ -179,18 +745,13 @@ impl App {
 fn main() {
     env_logger::init();
 
-    let event_loop = EventLoop::new().unwrap();
-    let window = Arc::new(
-        event_loop
-            .create_window(
-                winit::window::Window::default_attributes()
-                    .with_title("Toy 4: Spherical Chunk Streaming")
-                    .with_inner_size(winit::dpi::PhysicalSize::new(1280, 720)),
-            )
-            .unwrap(),
-    );
-
-    let mut app = App::new();
+    // Parse command-line args
+    let args: Vec<String> = std::env::args().collect();
+    let chunk_size = if args.len() > 1 {
+        args[1].parse().unwrap_or(DEFAULT_CHUNK_SIZE)
+    } else {
+        DEFAULT_CHUNK_SIZE
+    };
 
     println!("=== Toy 4: Spherical Chunk Streaming ===");
     println!(
@@ -198,7 +759,7 @@ fn main() {
         PLANET_RADIUS,
         PLANET_RADIUS / 1000.0
     );
-    println!("Chunk size: {}x{} vertices", CHUNK_SIZE, CHUNK_SIZE);
+    println!("Chunk size: {}x{} vertices", chunk_size, chunk_size);
     println!("\nControls:");
     println!("  1/2 - Adjust altitude");
     println!("  3/4 - Adjust speed");
@@ -207,36 +768,13 @@ fn main() {
     println!("  P - Print camera stats");
     println!();
 
-    let _ = event_loop
-        .run(move |event, elwt| {
-            elwt.set_control_flow(ControlFlow::Poll);
+    let event_loop = EventLoop::new().unwrap();
+    event_loop.set_control_flow(ControlFlow::Poll);
 
-            match event {
-                Event::WindowEvent { event, .. } => match event {
-                    WindowEvent::CloseRequested => elwt.exit(),
-                    WindowEvent::KeyboardInput {
-                        event:
-                            KeyEvent {
-                                physical_key: PhysicalKey::Code(keycode),
-                                state: winit::event::ElementState::Pressed,
-                                ..
-                            },
-                        ..
-                    } => {
-                        app.handle_input(keycode);
-                    }
-                    WindowEvent::RedrawRequested => {
-                        app.update();
-                        // TODO: Render frame
-                        window.request_redraw();
-                    }
-                    _ => {}
-                },
-                Event::AboutToWait => {
-                    window.request_redraw();
-                }
-                _ => {}
-            }
-        })
-        .unwrap();
+    let mut handler = AppHandler {
+        app: None,
+        chunk_size,
+    };
+
+    event_loop.run_app(&mut handler).unwrap();
 }
