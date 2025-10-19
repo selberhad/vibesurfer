@@ -375,3 +375,19 @@ if should_update_terrain {
 - Terrain pattern repeats every 512m
 - This is acceptable for a toy/prototype
 - For production, increase grid size or spacing
+## Post-Implementation Discovery: The Real Problem
+
+**TL;DR: We were solving the wrong problem.**
+
+After implementing all approaches and encountering persistent artifacts (split screen, oscillation, seams), we discovered:
+
+**Toroidal topology != flat grid with wrapped edges**
+
+### What We Built
+- Flat XZ grid with wrap-around logic
+- Result: Visual discontinuities at all seams
+
+### What's Actually Needed
+**True 3D torus geometry** using parametric equations - see LEARNINGS.md for details and torus equations.
+
+The geometry must actually BE a torus, not a flat grid pretending to be one.

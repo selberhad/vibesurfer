@@ -233,53 +233,58 @@ if motion_mode == Circular {
 - `.ddd/SPEC.md` - Toroidal wrapping specification (good reference for integration)
 - `.ddd/PLAN.md` - 4-step simplified plan (demonstrates refactor-first approach)
 
-### ⚠️ Challenged: Toroidal Wrapping Implementation (Post-Session Discovery)
+### ❌ Failed: Toroidal Wrapping for Infinite Flat Terrain
 
-**Problem:** Initial implementation had terrain oscillating and only rendering on half the screen
+**Problem:** Attempted to create seamless infinite terrain using toroidal wrapping, but encountered persistent visual artifacts (split screen, oscillation, seams)
 
-**Root causes identified:**
-1. **Compute shader had broken wrapping logic** - Tried to position vertices camera-relative, creating discontinuities
-2. **Camera target wrapping was naive** - Wrapped target position independently, breaking look_at direction across seam
-3. **Index buffer didn't wrap toroidally** - Grid edges weren't connected, creating visible boundaries
-4. **Vertex shader didn't handle wrapping** - Critical: vertices must be repositioned relative to camera in render shader
+**What we tried:**
+1. **Camera wrapping with fixed grid** - Half-screen rendering when camera looks across seam
+2. **Vertex shader wrapping** - Oscillations with different directions on each side of split
+3. **Combined approaches** - Double-wrapping artifacts
+4. **Larger grid size** (1024×1024, 2048m extent) - Same issues at larger scale
 
-**The fix (4-part solution):**
+**Root cause discovered:**
+We were treating the problem as **wrapping a flat 2D grid** (like Pac-Man screen wrapping), but what's actually needed is **projecting the grid onto a 3D torus surface**.
 
-1. **Simplified compute shader** (terrain_compute.wgsl:132-152)
-   - Fixed terrain at torus positions (0-512m)
-   - Sample noise at fixed positions (creates repeating pattern every 512m - acceptable for toy)
-   - No camera-dependent positioning in compute
+**The fundamental misunderstanding:**
+- **What we implemented:** Flat XZ grid with wrap-around logic at boundaries
+- **What's actually needed:** Vertices positioned on a true 3D torus using parametric equations:
+  ```
+  x = (R + r*cos(v)) * cos(u)
+  y = r * sin(v)
+  z = (R + r*cos(v)) * sin(u)
+  ```
+  where u, v ∈ [0, 2π] are torus parameters
 
-2. **Fixed camera look direction** (lib.rs:139-142)
-   - Use direction vector instead of wrapped target position
-   - Prevents camera from "looking backward" when crossing seam
-   - `forward = Vec3::new(0.0, -60.0, 300.0).normalize()`
+**Why 3ds Max works seamlessly:**
+- Torus mesh has vertices positioned on actual 3D torus surface
+- Topology is naturally continuous (no special wrapping logic needed)
+- Camera just flies around a normal 3D mesh
+- Texture mapping works because it follows the torus parameterization
 
-3. **Toroidal index buffer** (lib.rs:159-186)
-   - Wrap grid indices: `(x + 1) % grid_size` and `(z + 1) % grid_size`
-   - Connects edges seamlessly (last column → first column, etc.)
-   - Creates true toroidal topology
+**Key insight:** "Toroidal topology" != "flat grid with wrapped edges"
+- A torus is a specific 3D shape embedded in 3D space
+- Cannot fake it with 2D grid + wrapping tricks
+- Need actual torus geometry for seamless infinite terrain
 
-4. **Vertex shader wrapping** (terrain_render.wgsl:26-43) **← CRITICAL**
-   - Wrap camera position to torus space
-   - Calculate nearest-distance offset for each vertex (handles seam crossing)
-   - Transform to unwrapped world position before projection
-   - This creates the "infinite ocean" effect - terrain visible across entire viewport
+**Attempted solutions and why they failed:**
+1. **Index buffer wrapping** - Created degenerate triangles at seam (flat grid doesn't connect properly)
+2. **Vertex shader repositioning** - Different wrapping offsets on each side created split/oscillation
+3. **Camera space wrapping** - Only shows terrain in one "tile", rest is black
 
-**Result:**
-- ✅ Full-screen seamless terrain rendering
-- ✅ No visible seams at any camera position (tested 0-1000m)
-- ✅ Smooth continuous motion
-- ✅ Terrain pattern repeats every 512m (acceptable trade-off)
+**What would actually work:**
+- Generate vertices on true 3D torus surface in compute shader
+- Use torus parametric equations with major radius R and minor radius r
+- Grid indices map to (u, v) torus parameters
+- Noise/height modulates the minor radius or adds surface displacement
+- No wrapping logic needed - geometry is naturally continuous!
 
-**Key insight:** For toroidal wrapping to work visually, **the vertex shader must reposition geometry relative to the camera**. The compute shader just creates the base geometry - the magic happens in the render pass.
+**Performance note:** 1024×1024 grid (1M vertices) runs at 120 FPS, so geometric torus is feasible
 
-**Performance:** No measurable impact - wrapping logic is simple modulo arithmetic per vertex
-
-**Lesson:** Toroidal wrapping for infinite terrain requires coordination across THREE layers:
-1. Compute shader: Generate fixed torus geometry
-2. Index buffer: Connect edges toroidally
-3. Vertex shader: Position vertices relative to wrapped camera (the critical piece!)
+**Conclusion:** This toy validated that flat-grid toroidal wrapping doesn't work for seamless infinite terrain. For Vibesurfer, either:
+1. Implement proper 3D torus geometry (donut-shaped ocean)
+2. Use different approach (e.g., grid flow, chunked LOD system)
+3. Accept visible seams at torus boundaries (if extents are large enough)
 
 ## Meta-Learning (DDD Process)
 
