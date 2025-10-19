@@ -4,8 +4,10 @@
 
 set -e
 
+# Configuration
 OUTPUT_FILE="LOC_REPORT.md"
 TEMP_FILE="${OUTPUT_FILE}.tmp"
+RUST_SRC_DIR="vibesurfer/src"  # Main project source directory
 
 # Files allowed to exceed 200 impl lines (infrastructure, shared utilities, etc.)
 ALLOWED_LARGE_FILES=(
@@ -27,7 +29,7 @@ fi
 
 # Count Rust source code
 echo "Counting Rust LOC..."
-RUST_JSON=$(cloc --json --quiet src 2>/dev/null)
+RUST_JSON=$(cloc --json --quiet "$RUST_SRC_DIR" 2>/dev/null)
 
 # Parse JSON with jq
 RUST_CODE=$(echo "$RUST_JSON" | jq '.Rust.code // 0')
@@ -98,7 +100,7 @@ cat > "$TEMP_FILE" <<EOF
 ## Rust Code Breakdown
 
 \`\`\`
-$(cloc src 2>/dev/null | tail -n +3)
+$(cloc "$RUST_SRC_DIR" 2>/dev/null | tail -n +3)
 \`\`\`
 
 ---
@@ -131,7 +133,7 @@ while IFS= read -r file; do
         TEST_PCT="0.0"
     fi
 
-    DISPLAY_PATH=$(echo "$file" | sed 's|^src/||')
+    DISPLAY_PATH=$(echo "$file" | sed "s|^$RUST_SRC_DIR/||")
 
     # Flag files with >200 impl lines (unless whitelisted)
     if [ "$IMPL" -gt 200 ]; then
@@ -146,7 +148,7 @@ while IFS= read -r file; do
     fi
 
     echo "| \`$DISPLAY_PATH\` | $(format_number $TOTAL) | $(format_number $IMPL) | $(format_number $TEST) | ${TEST_PCT}% | $STATUS |" >> "$TEMP_FILE"
-done < <(find src -name "*.rs" -type f | sort)
+done < <(find "$RUST_SRC_DIR" -name "*.rs" -type f | sort)
 
 # Add warning section if there are large files
 if [ "$LARGE_COUNT" -gt 0 ]; then
