@@ -1,0 +1,22 @@
+[package]
+name = "vibesurfer"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = []
+gpu-terrain = []  # Phase 1: GPU compute terrain generation
+
+[dependencies]
+wgpu = "23"
+winit = "0.30"
+glicol = "0.13"
+cpal = "0.15"
+rustfft = "6"
+bytemuck = { version = "1.14", features = ["derive"] }
+noise = "0.9"
+glam = "0.29"
+pollster = "0.3"
+clap = { version = "4.5", features = ["derive"] }
+hound = "3.5"
+image = "0.25"

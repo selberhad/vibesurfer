@@ -1,6 +1,6 @@
 # Lines of Code Report
 
-**Last Updated**: 2025-10-18 21:56
+**Last Updated**: 2025-10-18 21:58
 **Tool**: [cloc](https://github.com/AlDanial/cloc) + wc
 
 ---
@@ -9,26 +9,20 @@
 
 | Metric | Rust Code | Documentation (.md) | Total |
 |--------|-----------|---------------------|-------|
-| **Lines** | 1,728 | 9,264 | 10,992 |
-| **Comments** | 410 | - | 410 |
-| **Blank Lines** | 383 | - | 383 |
-| **Total Lines** | 2,521 | 9,264 | 11,785 |
-| **Files** | 18 | 29 | 47 |
+| **Lines** | 0 | 9,264 | 9,264 |
+| **Comments** | 0 | - | 0 |
+| **Blank Lines** | 0 | - | 0 |
+| **Total Lines** | 0 | 9,264 | 9,264 |
+| **Files** | 0 | 29 | 29 |
 
-**Documentation Ratio**: 5.36 lines of docs per line of code
+**Documentation Ratio**: N/A lines of docs per line of code
 
 ---
 
 ## Rust Code Breakdown
 
 ```
-Language                     files          blank        comment           code
--------------------------------------------------------------------------------
-Rust                            18            383            410           1728
-WGSL                             4             85             53            274
--------------------------------------------------------------------------------
-SUM:                            22            468            463           2002
--------------------------------------------------------------------------------
+
 ```
 
 ---
@@ -37,26 +31,6 @@ SUM:                            22            468            463           2002
 
 | File | Total Lines | Impl Lines | Test Lines | Test % | Status |
 |------|-------------|------------|------------|--------|--------|
-| `audio/fft.rs` | 91 | 77 | 14 | 15.4% | ✅ |
-| `audio/mod.rs` | 11 | 11 | 0 | 0.0% | ✅ |
-| `audio/synthesis.rs` | 12 | 12 | 0 | 0.0% | ✅ |
-| `audio/system.rs` | 186 | 150 | 36 | 19.4% | ✅ |
-| `camera.rs` | 263 | 181 | 82 | 31.2% | ✅ |
-| `cli.rs` | 88 | 88 | 0 | 0.0% | ✅ |
-| `lib.rs` | 9 | 9 | 0 | 0.0% | ✅ |
-| `main.rs` | 316 | 316 | 0 | 0.0% | ⚠️ Large |
-| `noise.rs` | 27 | 27 | 0 | 0.0% | ✅ |
-| `ocean/mesh.rs` | 236 | 236 | 0 | 0.0% | ⚠️ Large |
-| `ocean/mod.rs` | 34 | 17 | 17 | 50.0% | ✅ |
-| `ocean/system.rs` | 91 | 67 | 24 | 26.4% | ✅ |
-| `params/audio.rs` | 87 | 87 | 0 | 0.0% | ✅ |
-| `params/camera.rs` | 237 | 237 | 0 | 0.0% | ⚠️ Large |
-| `params/mod.rs` | 17 | 17 | 0 | 0.0% | ✅ |
-| `params/ocean.rs` | 103 | 103 | 0 | 0.0% | ✅ |
-| `params/render.rs` | 79 | 79 | 0 | 0.0% | ✅ |
-| `rendering.rs` | 634 | 634 | 0 | 0.0% | ✅ (infra) |
-
-**⚠️ Warning:** 3 file(s) over 200 impl lines - consider splitting for maintainability
 
 ---
 
@@ -100,7 +74,7 @@ SUM:                            22            468            463           2002
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| Docs/Code Ratio | ≥0.3 | 5.36 | ✅ Excellent |
+| Docs/Code Ratio | ≥0.3 | N/A | ⏳ N/A |
 | README exists | Yes | ✅ | Met |
 | ARCHITECTURE.md | Optional | ✅ | Optional |
 
