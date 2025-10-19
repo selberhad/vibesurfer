@@ -124,6 +124,144 @@ impl OrbitCamera {
     }
 }
 
+// === Chunk System ===
+
+#[derive(Debug, Hash, Eq, PartialEq, Copy, Clone)]
+struct ChunkId {
+    lat_cell: i32,
+    lon_cell: i32,
+}
+
+impl ChunkId {
+    fn from_camera_angle(camera_angle: f32, chunk_angular_size: f32) -> Self {
+        // Camera is on equator (lat = 0)
+        ChunkId {
+            lat_cell: 0,
+            lon_cell: (camera_angle / chunk_angular_size).floor() as i32,
+        }
+    }
+
+    fn center_lon(&self, chunk_angular_size: f32) -> f32 {
+        (self.lon_cell as f32 + 0.5) * chunk_angular_size
+    }
+
+    fn neighbors(&self) -> Vec<ChunkId> {
+        let mut neighbors = Vec::new();
+        for dlat in -1..=1 {
+            for dlon in -1..=1 {
+                neighbors.push(ChunkId {
+                    lat_cell: self.lat_cell + dlat,
+                    lon_cell: self.lon_cell + dlon,
+                });
+            }
+        }
+        neighbors
+    }
+}
+
+struct Chunk {
+    id: ChunkId,
+    vertex_buffer: wgpu::Buffer,
+    index_buffer: wgpu::Buffer,
+    index_count: u32,
+}
+
+impl Chunk {
+    fn create(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        compute_pipeline: &wgpu::ComputePipeline,
+        compute_bind_group_layout: &wgpu::BindGroupLayout,
+        id: ChunkId,
+        chunk_size: u32,
+        grid_spacing: f32,
+        chunk_angular_size: f32,
+    ) -> Self {
+        let vertex_count = chunk_size * chunk_size;
+
+        // Create vertex buffer
+        let vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Chunk Vertex Buffer"),
+            size: (vertex_count as u64) * std::mem::size_of::<Vertex>() as u64,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::VERTEX,
+            mapped_at_creation: false,
+        });
+
+        // Create sphere params for this chunk
+        let sphere_params = SphereParams {
+            planet_radius: PLANET_RADIUS,
+            chunk_center_lat: 0.0,
+            chunk_center_lon: id.center_lon(chunk_angular_size),
+            grid_size: chunk_size,
+            grid_spacing,
+            _padding1: 0.0,
+            _padding2: 0.0,
+            _padding3: 0.0,
+        };
+
+        let sphere_params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Chunk Params Buffer"),
+            size: std::mem::size_of::<SphereParams>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        queue.write_buffer(&sphere_params_buffer, 0, bytemuck::bytes_of(&sphere_params));
+
+        // Create compute bind group
+        let compute_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Chunk Compute Bind Group"),
+            layout: compute_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: vertex_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: sphere_params_buffer.as_entire_binding(),
+                },
+            ],
+        });
+
+        // Run compute shader once to generate chunk geometry
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Chunk Compute Encoder"),
+        });
+
+        {
+            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("Chunk Compute Pass"),
+                timestamp_writes: None,
+            });
+            compute_pass.set_pipeline(compute_pipeline);
+            compute_pass.set_bind_group(0, &compute_bind_group, &[]);
+            let workgroup_count = (vertex_count + 255) / 256;
+            compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
+        }
+
+        queue.submit(std::iter::once(encoder.finish()));
+
+        // Create index buffer
+        let indices = generate_grid_indices(chunk_size);
+        let index_count = indices.len() as u32;
+
+        let index_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Chunk Index Buffer"),
+            size: (indices.len() * std::mem::size_of::<u32>()) as u64,
+            usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        queue.write_buffer(&index_buffer, 0, bytemuck::cast_slice(&indices));
+
+        Chunk {
+            id,
+            vertex_buffer,
+            index_buffer,
+            index_count,
+        }
+    }
+}
+
 // === Helper Functions ===
 
 fn generate_grid_indices(grid_size: u32) -> Vec<u32> {
