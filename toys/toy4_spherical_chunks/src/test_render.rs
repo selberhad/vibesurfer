@@ -178,14 +178,17 @@ async fn render_frame(camera_angle: f32, chunk_size: u32) {
         r * lat.cos() * lon.sin(),
     );
 
-    // Chunk center at same longitude as camera, on sphere surface
-    let chunk_center = glam::Vec3::new(
-        PLANET_RADIUS * 0.0_f32.cos() * camera_angle.cos(),
-        PLANET_RADIUS * 0.0_f32.sin(),
-        PLANET_RADIUS * 0.0_f32.cos() * camera_angle.sin(),
+    // Look ahead along the orbital path (300m forward on the sphere surface)
+    let look_ahead_meters = 300.0;
+    let look_ahead_angle = camera_angle + look_ahead_meters / PLANET_RADIUS;
+
+    let look_at = glam::Vec3::new(
+        PLANET_RADIUS * look_ahead_angle.cos(),
+        0.0, // Same latitude (equator)
+        PLANET_RADIUS * look_ahead_angle.sin(),
     );
 
-    let view_matrix = glam::Mat4::look_at_rh(camera_pos, chunk_center, glam::Vec3::Y);
+    let view_matrix = glam::Mat4::look_at_rh(camera_pos, look_at, glam::Vec3::Y);
     let proj_matrix = glam::Mat4::perspective_rh(
         60.0_f32.to_radians(),
         WIDTH as f32 / HEIGHT as f32,

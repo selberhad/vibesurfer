@@ -82,10 +82,18 @@ impl OrbitCamera {
     fn view_proj_matrix(&self, aspect_ratio: f32) -> [[f32; 4]; 4] {
         let pos = self.position();
 
-        // Look at chunk center at (PLANET_RADIUS, 0, 0)
-        let chunk_center = glam::Vec3::new(PLANET_RADIUS, 0.0, 0.0);
+        // Look ahead along the orbital path (300m forward on the sphere surface)
+        let look_ahead_meters = 300.0;
+        let look_ahead_angle = self.angular_pos + look_ahead_meters / PLANET_RADIUS;
 
-        let view = glam::Mat4::look_at_rh(pos, chunk_center, glam::Vec3::Y);
+        // Look at point is on sphere surface, ahead along orbit
+        let look_at = glam::Vec3::new(
+            PLANET_RADIUS * look_ahead_angle.cos(),
+            0.0, // Same latitude (equator)
+            PLANET_RADIUS * look_ahead_angle.sin(),
+        );
+
+        let view = glam::Mat4::look_at_rh(pos, look_at, glam::Vec3::Y);
         let proj = glam::Mat4::perspective_rh(
             60.0_f32.to_radians(),
             aspect_ratio,
