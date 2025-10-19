@@ -1,60 +1,9 @@
 // Headless rendering test for spherical chunk streaming
-use bytemuck;
 use std::env;
+use toy4_spherical_chunks::*;
 
 const WIDTH: u32 = 1280;
 const HEIGHT: u32 = 720;
-const PLANET_RADIUS: f32 = 1_000_000.0;
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct Vertex {
-    position: [f32; 3],
-    _padding1: f32,
-    uv: [f32; 2],
-    _padding2: [f32; 2],
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct SphereParams {
-    planet_radius: f32,
-    chunk_center_lat: f32,
-    chunk_center_lon: f32,
-    grid_size: u32,
-    grid_spacing: f32,
-    _padding1: f32,
-    _padding2: f32,
-    _padding3: f32,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct CameraUniforms {
-    view_proj: [[f32; 4]; 4],
-}
-
-fn generate_grid_indices(grid_size: u32) -> Vec<u32> {
-    let mut indices = Vec::new();
-    for z in 0..grid_size - 1 {
-        for x in 0..grid_size - 1 {
-            let top_left = z * grid_size + x;
-            let top_right = top_left + 1;
-            let bottom_left = (z + 1) * grid_size + x;
-            let bottom_right = bottom_left + 1;
-
-            indices.push(top_left);
-            indices.push(bottom_left);
-            indices.push(bottom_left);
-            indices.push(bottom_right);
-            indices.push(bottom_right);
-            indices.push(top_right);
-            indices.push(top_right);
-            indices.push(top_left);
-        }
-    }
-    indices
-}
 
 fn main() {
     // Parse command line arguments
@@ -106,8 +55,6 @@ async fn render_frames(angles: Vec<f32>, chunk_size: u32) {
 }
 
 async fn render_frame(camera_angle: f32, chunk_size: u32) {
-    let vertex_count = chunk_size * chunk_size;
-
     // Setup wgpu headless
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
         backends: wgpu::Backends::all(),
@@ -154,34 +101,6 @@ async fn render_frame(camera_angle: f32, chunk_size: u32) {
 
     let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-    // Create vertex buffer
-    let vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("Vertex Buffer"),
-        size: (vertex_count as u64) * std::mem::size_of::<Vertex>() as u64,
-        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::VERTEX,
-        mapped_at_creation: false,
-    });
-
-    // Create sphere params - chunk follows camera longitude
-    let sphere_params = SphereParams {
-        planet_radius: PLANET_RADIUS,
-        chunk_center_lat: 0.0,
-        chunk_center_lon: camera_angle, // Chunk rotates with camera
-        grid_size: chunk_size,
-        grid_spacing: 2.0,
-        _padding1: 0.0,
-        _padding2: 0.0,
-        _padding3: 0.0,
-    };
-
-    let sphere_params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("Sphere Params Buffer"),
-        size: std::mem::size_of::<SphereParams>() as u64,
-        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    });
-    queue.write_buffer(&sphere_params_buffer, 0, bytemuck::bytes_of(&sphere_params));
-
     // Create compute pipeline
     let compute_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("Compute Shader"),
@@ -215,21 +134,6 @@ async fn render_frame(camera_angle: f32, chunk_size: u32) {
             ],
         });
 
-    let compute_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some("Compute Bind Group"),
-        layout: &compute_bind_group_layout,
-        entries: &[
-            wgpu::BindGroupEntry {
-                binding: 0,
-                resource: vertex_buffer.as_entire_binding(),
-            },
-            wgpu::BindGroupEntry {
-                binding: 1,
-                resource: sphere_params_buffer.as_entire_binding(),
-            },
-        ],
-    });
-
     let compute_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("Compute Pipeline Layout"),
         bind_group_layouts: &[&compute_bind_group_layout],
@@ -245,23 +149,22 @@ async fn render_frame(camera_angle: f32, chunk_size: u32) {
         cache: Default::default(),
     });
 
-    // Run compute shader
-    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-        label: Some("Compute Encoder"),
-    });
+    // Create chunk using lib
+    let grid_spacing = 2.0;
+    let chunk_extent_meters = chunk_size as f32 * grid_spacing;
+    let chunk_angular_size = chunk_extent_meters / PLANET_RADIUS;
 
-    {
-        let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-            label: Some("Compute Pass"),
-            timestamp_writes: None,
-        });
-        compute_pass.set_pipeline(&compute_pipeline);
-        compute_pass.set_bind_group(0, &compute_bind_group, &[]);
-        let workgroup_count = (vertex_count + 255) / 256;
-        compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
-    }
-
-    queue.submit(std::iter::once(encoder.finish()));
+    let chunk_id = ChunkId::from_camera_angle(camera_angle, chunk_angular_size);
+    let chunk = Chunk::create(
+        &device,
+        &queue,
+        &compute_pipeline,
+        &compute_bind_group_layout,
+        chunk_id,
+        chunk_size,
+        grid_spacing,
+        chunk_angular_size,
+    );
 
     // Create camera
     let altitude = 100.0;
@@ -390,18 +293,6 @@ async fn render_frame(camera_angle: f32, chunk_size: u32) {
         cache: None,
     });
 
-    // Generate indices
-    let indices = generate_grid_indices(chunk_size);
-    let index_count = indices.len() as u32;
-
-    let index_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("Index Buffer"),
-        size: (indices.len() * std::mem::size_of::<u32>()) as u64,
-        usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    });
-    queue.write_buffer(&index_buffer, 0, bytemuck::cast_slice(&indices));
-
     // Render
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
         label: Some("Render Encoder"),
@@ -425,9 +316,9 @@ async fn render_frame(camera_angle: f32, chunk_size: u32) {
 
         render_pass.set_pipeline(&render_pipeline);
         render_pass.set_bind_group(0, &camera_bind_group, &[]);
-        render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
-        render_pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-        render_pass.draw_indexed(0..index_count, 0, 0..1);
+        render_pass.set_vertex_buffer(0, chunk.vertex_buffer.slice(..));
+        render_pass.set_index_buffer(chunk.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+        render_pass.draw_indexed(0..chunk.index_count, 0, 0..1);
     }
 
     queue.submit(std::iter::once(encoder.finish()));

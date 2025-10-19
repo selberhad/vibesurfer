@@ -1,4 +1,6 @@
+use std::collections::HashMap;
 use std::sync::Arc;
+use toy4_spherical_chunks::*;
 use winit::{
     application::ApplicationHandler,
     event::{KeyEvent, WindowEvent},
@@ -9,41 +11,10 @@ use winit::{
 
 // === Configuration ===
 
-const PLANET_RADIUS: f32 = 1_000_000.0; // 1000km radius
 const DEFAULT_CHUNK_SIZE: u32 = 256; // 256x256 vertices per chunk
 const DEFAULT_ALTITUDE: f32 = 100.0; // 100m above surface
 const DEFAULT_SPEED: f32 = 100.0; // 100 m/s tangential velocity
 const DEFAULT_SPACING: f32 = 2.0; // 2m between vertices
-
-// === Data Structures ===
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct Vertex {
-    position: [f32; 3],
-    _padding1: f32,
-    uv: [f32; 2],
-    _padding2: [f32; 2],
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct SphereParams {
-    planet_radius: f32,
-    chunk_center_lat: f32,
-    chunk_center_lon: f32,
-    grid_size: u32,
-    grid_spacing: f32,
-    _padding1: f32,
-    _padding2: f32,
-    _padding3: f32,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct CameraUniforms {
-    view_proj: [[f32; 4]; 4],
-}
 
 // === Orbital Camera ===
 
@@ -91,6 +62,9 @@ impl OrbitCamera {
 
     fn adjust_altitude(&mut self, delta: f32) {
         self.altitude = (self.altitude + delta).max(1.0); // Min 1m altitude
+                                                          // Update angular velocity to maintain same linear speed
+        let linear_speed = self.angular_velocity * (PLANET_RADIUS + self.altitude - delta);
+        self.angular_velocity = linear_speed / (PLANET_RADIUS + self.altitude);
         println!(
             "Altitude: {:.1}m (radius: {:.1}m)",
             self.altitude,
@@ -108,8 +82,7 @@ impl OrbitCamera {
     fn view_proj_matrix(&self, aspect_ratio: f32) -> [[f32; 4]; 4] {
         let pos = self.position();
 
-        // Chunk is centered at lat=0, lon=0 on the sphere surface
-        // Look at a point on the sphere surface in that direction
+        // Look at chunk center at (PLANET_RADIUS, 0, 0)
         let chunk_center = glam::Vec3::new(PLANET_RADIUS, 0.0, 0.0);
 
         let view = glam::Mat4::look_at_rh(pos, chunk_center, glam::Vec3::Y);
@@ -124,171 +97,6 @@ impl OrbitCamera {
     }
 }
 
-// === Chunk System ===
-
-#[derive(Debug, Hash, Eq, PartialEq, Copy, Clone)]
-struct ChunkId {
-    lat_cell: i32,
-    lon_cell: i32,
-}
-
-impl ChunkId {
-    fn from_camera_angle(camera_angle: f32, chunk_angular_size: f32) -> Self {
-        // Camera is on equator (lat = 0)
-        ChunkId {
-            lat_cell: 0,
-            lon_cell: (camera_angle / chunk_angular_size).floor() as i32,
-        }
-    }
-
-    fn center_lon(&self, chunk_angular_size: f32) -> f32 {
-        (self.lon_cell as f32 + 0.5) * chunk_angular_size
-    }
-
-    fn neighbors(&self) -> Vec<ChunkId> {
-        let mut neighbors = Vec::new();
-        for dlat in -1..=1 {
-            for dlon in -1..=1 {
-                neighbors.push(ChunkId {
-                    lat_cell: self.lat_cell + dlat,
-                    lon_cell: self.lon_cell + dlon,
-                });
-            }
-        }
-        neighbors
-    }
-}
-
-struct Chunk {
-    id: ChunkId,
-    vertex_buffer: wgpu::Buffer,
-    index_buffer: wgpu::Buffer,
-    index_count: u32,
-}
-
-impl Chunk {
-    fn create(
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        compute_pipeline: &wgpu::ComputePipeline,
-        compute_bind_group_layout: &wgpu::BindGroupLayout,
-        id: ChunkId,
-        chunk_size: u32,
-        grid_spacing: f32,
-        chunk_angular_size: f32,
-    ) -> Self {
-        let vertex_count = chunk_size * chunk_size;
-
-        // Create vertex buffer
-        let vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Chunk Vertex Buffer"),
-            size: (vertex_count as u64) * std::mem::size_of::<Vertex>() as u64,
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::VERTEX,
-            mapped_at_creation: false,
-        });
-
-        // Create sphere params for this chunk
-        let sphere_params = SphereParams {
-            planet_radius: PLANET_RADIUS,
-            chunk_center_lat: 0.0,
-            chunk_center_lon: id.center_lon(chunk_angular_size),
-            grid_size: chunk_size,
-            grid_spacing,
-            _padding1: 0.0,
-            _padding2: 0.0,
-            _padding3: 0.0,
-        };
-
-        let sphere_params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Chunk Params Buffer"),
-            size: std::mem::size_of::<SphereParams>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        queue.write_buffer(&sphere_params_buffer, 0, bytemuck::bytes_of(&sphere_params));
-
-        // Create compute bind group
-        let compute_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Chunk Compute Bind Group"),
-            layout: compute_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: vertex_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: sphere_params_buffer.as_entire_binding(),
-                },
-            ],
-        });
-
-        // Run compute shader once to generate chunk geometry
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Chunk Compute Encoder"),
-        });
-
-        {
-            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                label: Some("Chunk Compute Pass"),
-                timestamp_writes: None,
-            });
-            compute_pass.set_pipeline(compute_pipeline);
-            compute_pass.set_bind_group(0, &compute_bind_group, &[]);
-            let workgroup_count = (vertex_count + 255) / 256;
-            compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
-        }
-
-        queue.submit(std::iter::once(encoder.finish()));
-
-        // Create index buffer
-        let indices = generate_grid_indices(chunk_size);
-        let index_count = indices.len() as u32;
-
-        let index_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Chunk Index Buffer"),
-            size: (indices.len() * std::mem::size_of::<u32>()) as u64,
-            usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        queue.write_buffer(&index_buffer, 0, bytemuck::cast_slice(&indices));
-
-        Chunk {
-            id,
-            vertex_buffer,
-            index_buffer,
-            index_count,
-        }
-    }
-}
-
-// === Helper Functions ===
-
-fn generate_grid_indices(grid_size: u32) -> Vec<u32> {
-    let mut indices = Vec::new();
-
-    for z in 0..grid_size - 1 {
-        for x in 0..grid_size - 1 {
-            let top_left = z * grid_size + x;
-            let top_right = top_left + 1;
-            let bottom_left = (z + 1) * grid_size + x;
-            let bottom_right = bottom_left + 1;
-
-            // Two triangles per quad
-            indices.push(top_left);
-            indices.push(bottom_left);
-            indices.push(bottom_left);
-            indices.push(bottom_right);
-            indices.push(bottom_right);
-            indices.push(top_right);
-            indices.push(top_right);
-            indices.push(top_left);
-        }
-    }
-
-    indices
-}
-
 // === Main App ===
 
 struct App {
@@ -300,20 +108,20 @@ struct App {
 
     // Compute resources
     compute_pipeline: wgpu::ComputePipeline,
-    compute_bind_group: wgpu::BindGroup,
-    vertex_buffer: wgpu::Buffer,
-    sphere_params_buffer: wgpu::Buffer,
+    compute_bind_group_layout: wgpu::BindGroupLayout,
 
     // Render resources
     render_pipeline: wgpu::RenderPipeline,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
-    index_buffer: wgpu::Buffer,
-    index_count: u32,
+
+    // Chunk management
+    chunks: HashMap<ChunkId, Chunk>,
+    chunk_size: u32,
+    chunk_angular_size: f32,
+    grid_spacing: f32,
 
     camera: OrbitCamera,
-    grid_spacing: f32,
-    chunk_size: u32,
     last_frame: std::time::Instant,
     frame_count: u32,
     fps_timer: std::time::Instant,
@@ -323,7 +131,6 @@ struct App {
 impl App {
     async fn new(window: Arc<Window>, chunk_size: u32) -> Self {
         let size = window.inner_size();
-        let vertex_count = chunk_size * chunk_size;
 
         // Initialize wgpu
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -375,36 +182,6 @@ impl App {
         };
         surface.configure(&device, &config);
 
-        // Create vertex buffer (storage buffer for compute shader)
-        let vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Vertex Buffer"),
-            size: (vertex_count as u64) * std::mem::size_of::<Vertex>() as u64,
-            usage: wgpu::BufferUsages::STORAGE
-                | wgpu::BufferUsages::VERTEX
-                | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-
-        // Create sphere params buffer
-        let sphere_params = SphereParams {
-            planet_radius: PLANET_RADIUS,
-            chunk_center_lat: 0.0,
-            chunk_center_lon: 0.0,
-            grid_size: chunk_size,
-            grid_spacing: DEFAULT_SPACING,
-            _padding1: 0.0,
-            _padding2: 0.0,
-            _padding3: 0.0,
-        };
-
-        let sphere_params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Sphere Params Buffer"),
-            size: std::mem::size_of::<SphereParams>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        queue.write_buffer(&sphere_params_buffer, 0, bytemuck::bytes_of(&sphere_params));
-
         // Create compute pipeline
         let compute_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Compute Shader"),
@@ -437,21 +214,6 @@ impl App {
                     },
                 ],
             });
-
-        let compute_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Compute Bind Group"),
-            layout: &compute_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: vertex_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: sphere_params_buffer.as_entire_binding(),
-                },
-            ],
-        });
 
         let compute_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -567,37 +329,31 @@ impl App {
             cache: None,
         });
 
-        // Generate indices for wireframe
-        let indices = generate_grid_indices(chunk_size);
-        let index_count = indices.len() as u32;
+        // Calculate chunk angular size
+        let grid_spacing = DEFAULT_SPACING;
+        let chunk_extent_meters = chunk_size as f32 * grid_spacing;
+        let chunk_angular_size = chunk_extent_meters / PLANET_RADIUS;
 
-        let index_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Index Buffer"),
-            size: (indices.len() * std::mem::size_of::<u32>()) as u64,
-            usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        queue.write_buffer(&index_buffer, 0, bytemuck::cast_slice(&indices));
-
-        // Run initial compute pass
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Init Compute Encoder"),
-        });
-
-        {
-            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                label: Some("Init Compute Pass"),
-                timestamp_writes: None,
-            });
-            compute_pass.set_pipeline(&compute_pipeline);
-            compute_pass.set_bind_group(0, &compute_bind_group, &[]);
-            let workgroup_count = (vertex_count + 255) / 256;
-            compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
-        }
-
-        queue.submit(std::iter::once(encoder.finish()));
-
+        // Create initial chunk at camera position
         let camera = OrbitCamera::new(DEFAULT_ALTITUDE, DEFAULT_SPEED);
+        let camera_chunk_id = ChunkId::from_camera_angle(camera.angular_pos, chunk_angular_size);
+
+        let chunk = Chunk::create(
+            &device,
+            &queue,
+            &compute_pipeline,
+            &compute_bind_group_layout,
+            camera_chunk_id,
+            chunk_size,
+            grid_spacing,
+            chunk_angular_size,
+        );
+
+        let mut chunks = HashMap::new();
+        chunks.insert(camera_chunk_id, chunk);
+
+        println!("Chunk angular size: {:.6} radians", chunk_angular_size);
+        println!("Initial chunk: {:?}", camera_chunk_id);
 
         Self {
             surface,
@@ -606,17 +362,15 @@ impl App {
             config,
             size,
             compute_pipeline,
-            compute_bind_group,
-            vertex_buffer,
-            sphere_params_buffer,
+            compute_bind_group_layout,
             render_pipeline,
             camera_buffer,
             camera_bind_group,
-            index_buffer,
-            index_count,
-            camera,
-            grid_spacing: DEFAULT_SPACING,
+            chunks,
             chunk_size,
+            chunk_angular_size,
+            grid_spacing,
+            camera,
             last_frame: std::time::Instant::now(),
             frame_count: 0,
             fps_timer: std::time::Instant::now(),
@@ -631,50 +385,35 @@ impl App {
 
         self.camera.update(dt);
 
-        // Update chunk to follow camera longitude
-        let sphere_params = SphereParams {
-            planet_radius: PLANET_RADIUS,
-            chunk_center_lat: 0.0,
-            chunk_center_lon: self.camera.angular_pos,
-            grid_size: self.chunk_size,
-            grid_spacing: self.grid_spacing,
-            _padding1: 0.0,
-            _padding2: 0.0,
-            _padding3: 0.0,
-        };
-        self.queue.write_buffer(
-            &self.sphere_params_buffer,
-            0,
-            bytemuck::bytes_of(&sphere_params),
-        );
+        // Determine which chunk camera is in
+        let current_chunk_id =
+            ChunkId::from_camera_angle(self.camera.angular_pos, self.chunk_angular_size);
 
-        // Re-run compute shader
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Update Chunk Encoder"),
-            });
-
-        {
-            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                label: Some("Update Chunk Pass"),
-                timestamp_writes: None,
-            });
-            compute_pass.set_pipeline(&self.compute_pipeline);
-            compute_pass.set_bind_group(0, &self.compute_bind_group, &[]);
-            let workgroup_count = (self.chunk_size * self.chunk_size + 255) / 256;
-            compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
+        // Make sure current chunk exists
+        if !self.chunks.contains_key(&current_chunk_id) {
+            let chunk = Chunk::create(
+                &self.device,
+                &self.queue,
+                &self.compute_pipeline,
+                &self.compute_bind_group_layout,
+                current_chunk_id,
+                self.chunk_size,
+                self.grid_spacing,
+                self.chunk_angular_size,
+            );
+            self.chunks.insert(current_chunk_id, chunk);
+            println!("Loaded chunk {:?}", current_chunk_id);
         }
-
-        self.queue.submit(std::iter::once(encoder.finish()));
 
         // FPS counter
         self.frame_count += 1;
         if (now - self.fps_timer).as_secs() >= 1 {
+            let total_vertices: u32 = self.chunks.len() as u32 * self.chunk_size * self.chunk_size;
             println!(
-                "FPS: {} | Vertices: {} | Spacing: {:.2}m",
+                "FPS: {} | Chunks: {} | Vertices: {} | Spacing: {:.2}m",
                 self.frame_count,
-                self.chunk_size * self.chunk_size,
+                self.chunks.len(),
+                total_vertices,
                 self.grid_spacing
             );
             self.frame_count = 0;
@@ -724,9 +463,14 @@ impl App {
 
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-            render_pass.draw_indexed(0..self.index_count, 0, 0..1);
+
+            // Render all chunks
+            for chunk in self.chunks.values() {
+                render_pass.set_vertex_buffer(0, chunk.vertex_buffer.slice(..));
+                render_pass
+                    .set_index_buffer(chunk.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+                render_pass.draw_indexed(0..chunk.index_count, 0, 0..1);
+            }
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
@@ -742,12 +486,12 @@ impl App {
             KeyCode::Digit5 => {
                 self.grid_spacing = (self.grid_spacing * 0.5).max(0.25);
                 println!("Grid spacing: {:.2}m", self.grid_spacing);
-                self.update_sphere_params();
+                self.recreate_chunks();
             }
             KeyCode::Digit6 => {
                 self.grid_spacing = (self.grid_spacing * 2.0).min(10.0);
                 println!("Grid spacing: {:.2}m", self.grid_spacing);
-                self.update_sphere_params();
+                self.recreate_chunks();
             }
             KeyCode::Space => {
                 self.camera.paused = !self.camera.paused;
@@ -771,42 +515,29 @@ impl App {
         }
     }
 
-    fn update_sphere_params(&mut self) {
-        let sphere_params = SphereParams {
-            planet_radius: PLANET_RADIUS,
-            chunk_center_lat: 0.0,
-            chunk_center_lon: 0.0,
-            grid_size: self.chunk_size,
-            grid_spacing: self.grid_spacing,
-            _padding1: 0.0,
-            _padding2: 0.0,
-            _padding3: 0.0,
-        };
-        self.queue.write_buffer(
-            &self.sphere_params_buffer,
-            0,
-            bytemuck::bytes_of(&sphere_params),
+    fn recreate_chunks(&mut self) {
+        // Recalculate chunk angular size
+        let chunk_extent_meters = self.chunk_size as f32 * self.grid_spacing;
+        self.chunk_angular_size = chunk_extent_meters / PLANET_RADIUS;
+
+        // Clear existing chunks
+        self.chunks.clear();
+
+        // Create chunk at current camera position
+        let camera_chunk_id =
+            ChunkId::from_camera_angle(self.camera.angular_pos, self.chunk_angular_size);
+        let chunk = Chunk::create(
+            &self.device,
+            &self.queue,
+            &self.compute_pipeline,
+            &self.compute_bind_group_layout,
+            camera_chunk_id,
+            self.chunk_size,
+            self.grid_spacing,
+            self.chunk_angular_size,
         );
-
-        // Re-run compute shader
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Update Compute Encoder"),
-            });
-
-        {
-            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                label: Some("Update Compute Pass"),
-                timestamp_writes: None,
-            });
-            compute_pass.set_pipeline(&self.compute_pipeline);
-            compute_pass.set_bind_group(0, &self.compute_bind_group, &[]);
-            let workgroup_count = (self.chunk_size * self.chunk_size + 255) / 256;
-            compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
-        }
-
-        self.queue.submit(std::iter::once(encoder.finish()));
+        self.chunks.insert(camera_chunk_id, chunk);
+        println!("Recreated chunk {:?}", camera_chunk_id);
     }
 
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
