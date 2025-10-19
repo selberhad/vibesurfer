@@ -385,25 +385,8 @@ impl App {
 
         self.camera.update(dt);
 
-        // Determine which chunk camera is in
-        let current_chunk_id =
-            ChunkId::from_camera_angle(self.camera.angular_pos, self.chunk_angular_size);
-
-        // Make sure current chunk exists
-        if !self.chunks.contains_key(&current_chunk_id) {
-            let chunk = Chunk::create(
-                &self.device,
-                &self.queue,
-                &self.compute_pipeline,
-                &self.compute_bind_group_layout,
-                current_chunk_id,
-                self.chunk_size,
-                self.grid_spacing,
-                self.chunk_angular_size,
-            );
-            self.chunks.insert(current_chunk_id, chunk);
-            println!("Loaded chunk {:?}", current_chunk_id);
-        }
+        // Update chunk streaming (3×3 grid)
+        self.update_chunks();
 
         // FPS counter
         self.frame_count += 1;
@@ -418,6 +401,44 @@ impl App {
             );
             self.frame_count = 0;
             self.fps_timer = now;
+        }
+    }
+
+    fn update_chunks(&mut self) {
+        use std::collections::HashSet;
+
+        // Determine which chunk camera is in
+        let center_chunk_id =
+            ChunkId::from_camera_angle(self.camera.angular_pos, self.chunk_angular_size);
+
+        // Get 3×3 grid of chunks around camera
+        let needed_chunks: HashSet<ChunkId> = center_chunk_id.neighbors().into_iter().collect();
+
+        // Unload chunks that are too far away
+        self.chunks.retain(|id, _| {
+            let keep = needed_chunks.contains(id);
+            if !keep {
+                println!("Unloaded chunk {:?}", id);
+            }
+            keep
+        });
+
+        // Load missing chunks
+        for chunk_id in needed_chunks {
+            if !self.chunks.contains_key(&chunk_id) {
+                let chunk = Chunk::create(
+                    &self.device,
+                    &self.queue,
+                    &self.compute_pipeline,
+                    &self.compute_bind_group_layout,
+                    chunk_id,
+                    self.chunk_size,
+                    self.grid_spacing,
+                    self.chunk_angular_size,
+                );
+                self.chunks.insert(chunk_id, chunk);
+                println!("Loaded chunk {:?}", chunk_id);
+            }
         }
     }
 
