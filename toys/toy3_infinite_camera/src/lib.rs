@@ -121,19 +121,33 @@ impl TerrainParams {
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct CameraUniforms {
     pub view_proj: [[f32; 4]; 4],
+    pub camera_pos: [f32; 3],
+    pub _padding: f32,
+    pub torus_extent: f32,
+    pub _padding2: [f32; 3], // Pad to 96 bytes (16-byte alignment)
 }
 
 // === Camera Math ===
 
-pub fn create_perspective_view_proj_matrix(aspect: f32) -> [[f32; 4]; 4] {
+pub fn create_perspective_view_proj_matrix(
+    camera_pos: [f32; 3],
+    torus_extent: f32,
+    aspect: f32,
+) -> [[f32; 4]; 4] {
     // Use glam for correct matrix math - proven implementation
     use glam::{Mat4, Vec3};
 
-    // Camera at origin in view space (vertices are already camera-relative)
-    let eye = Vec3::new(0.0, 80.0, 0.0);
+    // Wrap camera position to torus space (like orbiting a donut in 3ds Max)
+    let torus_x = camera_pos[0].rem_euclid(torus_extent);
+    let torus_z = camera_pos[2].rem_euclid(torus_extent);
 
-    // Look ahead and down for horizon view
-    let target = Vec3::new(0.0, 20.0, 300.0);
+    // Camera position in torus space, 80m above terrain
+    let eye = Vec3::new(torus_x, 80.0, torus_z);
+
+    // Look direction: straight ahead (forward in Z)
+    // Use unwrapped target to avoid seam when crossing torus boundary
+    let forward = Vec3::new(0.0, -60.0, 300.0).normalize(); // Look ahead and slightly down
+    let target = eye + forward * 300.0; // 300m ahead
 
     // World up
     let up = Vec3::Y;
@@ -152,22 +166,29 @@ pub fn create_perspective_view_proj_matrix(aspect: f32) -> [[f32; 4]; 4] {
 
 pub fn generate_grid_indices(grid_size: u32) -> Vec<u32> {
     let mut indices = Vec::new();
-    // Generate line segments for a wireframe grid
-    // Horizontal lines (connect vertices in same row)
+
+    // Generate line segments for a toroidal wireframe grid
+    // Horizontal lines (connect vertices in same row, wrapping at edges)
     for z in 0..grid_size {
-        for x in 0..grid_size - 1 {
-            let i = z * grid_size + x;
-            indices.push(i);
-            indices.push(i + 1);
-        }
-    }
-    // Vertical lines (connect vertices in same column)
-    for z in 0..grid_size - 1 {
         for x in 0..grid_size {
             let i = z * grid_size + x;
+            let next_x = (x + 1) % grid_size; // Wrap to 0 at edge
+            let next_i = z * grid_size + next_x;
             indices.push(i);
-            indices.push(i + grid_size);
+            indices.push(next_i);
         }
     }
+
+    // Vertical lines (connect vertices in same column, wrapping at edges)
+    for z in 0..grid_size {
+        for x in 0..grid_size {
+            let i = z * grid_size + x;
+            let next_z = (z + 1) % grid_size; // Wrap to 0 at edge
+            let next_i = next_z * grid_size + x;
+            indices.push(i);
+            indices.push(next_i);
+        }
+    }
+
     indices
 }

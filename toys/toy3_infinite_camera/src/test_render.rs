@@ -10,16 +10,50 @@ const HEIGHT: u32 = 720;
 const GRID_SIZE: u32 = 512;
 
 fn main() {
-    // Parse camera_z from command line (default to 5 seconds @ 10m/s = 50m)
+    // Parse command line arguments
+    // Usage: test_render [start_z] [end_z] [step]
+    // Example: test_render 0 200 50  -> renders at Z=0, 50, 100, 150, 200
     let args: Vec<String> = env::args().collect();
-    let camera_z = if args.len() > 1 {
-        args[1].parse::<f32>().unwrap_or(50.0)
+
+    let (start_z, end_z, step) = if args.len() >= 4 {
+        (
+            args[1].parse::<f32>().unwrap_or(0.0),
+            args[2].parse::<f32>().unwrap_or(200.0),
+            args[3].parse::<f32>().unwrap_or(50.0),
+        )
+    } else if args.len() == 2 {
+        // Single frame mode (backward compatibility)
+        let z = args[1].parse::<f32>().unwrap_or(0.0);
+        (z, z, 1.0)
     } else {
-        50.0
+        // Default: render frames from 0 to 200m in 50m steps
+        (0.0, 200.0, 50.0)
     };
 
-    println!("Rendering at camera_z = {}m", camera_z);
-    pollster::block_on(render_frame(camera_z));
+    // Generate sequence of Z positions
+    let mut z_positions = Vec::new();
+    let mut z = start_z;
+    while z <= end_z {
+        z_positions.push(z);
+        z += step;
+    }
+
+    println!(
+        "Rendering {} frames from {}m to {}m (step: {}m)",
+        z_positions.len(),
+        start_z,
+        end_z,
+        step
+    );
+
+    pollster::block_on(render_frames(z_positions));
+}
+
+async fn render_frames(z_positions: Vec<f32>) {
+    // Render all frames in one GPU session for efficiency
+    for camera_z in z_positions {
+        render_frame(camera_z).await;
+    }
 }
 
 async fn render_frame(camera_z: f32) {
@@ -101,7 +135,8 @@ async fn render_frame(camera_z: f32) {
 
     // Camera with perspective projection
     let aspect = WIDTH as f32 / HEIGHT as f32;
-    let view_proj = create_perspective_view_proj_matrix(aspect);
+    let torus_extent = 2.0 * GRID_SIZE as f32; // grid_spacing * grid_size
+    let view_proj = create_perspective_view_proj_matrix([0.0, 0.0, camera_z], torus_extent, aspect);
 
     let camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Camera Buffer"),
@@ -113,7 +148,13 @@ async fn render_frame(camera_z: f32) {
     queue.write_buffer(
         &camera_buffer,
         0,
-        bytemuck::bytes_of(&CameraUniforms { view_proj }),
+        bytemuck::bytes_of(&CameraUniforms {
+            view_proj,
+            camera_pos: [0.0, 0.0, camera_z],
+            _padding: 0.0,
+            torus_extent,
+            _padding2: [0.0, 0.0, 0.0],
+        }),
     );
 
     // Load shaders

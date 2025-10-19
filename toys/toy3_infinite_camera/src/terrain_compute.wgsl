@@ -129,45 +129,25 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let x = idx % grid_size;
     let z = idx / grid_size;
 
-    // Calculate grid-local position (0 to torus_extent)
-    let local_x = f32(x) * params.grid_spacing;
-    let local_z = f32(z) * params.grid_spacing;
+    // Simple torus-space positions (fixed grid from 0 to torus_extent)
+    let pos_x = f32(x) * params.grid_spacing;
+    let pos_z = f32(z) * params.grid_spacing;
 
-    // Wrap camera position to torus space (modulo operation)
-    let camera_torus_x = params.camera_pos.x - floor(params.camera_pos.x / params.torus_extent_x) * params.torus_extent_x;
-    let camera_torus_z = params.camera_pos.z - floor(params.camera_pos.z / params.torus_extent_z) * params.torus_extent_z;
-
-    // Calculate offset from camera (raw difference)
-    var dx = local_x - camera_torus_x;
-    var dz = local_z - camera_torus_z;
-
-    // Wrap to nearest distance on torus (handle seam crossing)
-    let half_extent_x = params.torus_extent_x * 0.5;
-    let half_extent_z = params.torus_extent_z * 0.5;
-
-    if (dx > half_extent_x) { dx -= params.torus_extent_x; }
-    if (dx < -half_extent_x) { dx += params.torus_extent_x; }
-    if (dz > half_extent_z) { dz -= params.torus_extent_z; }
-    if (dz < -half_extent_z) { dz += params.torus_extent_z; }
-
-    // For noise sampling, use unwrapped world coordinates
-    let world_x = params.camera_pos.x + dx;
-    let world_z = params.camera_pos.z + dz;
-
-    // Sample base terrain at world coordinates (coherent across torus wrapping)
-    let base_coord_x = world_x * 0.1 * params.base_frequency;
-    let base_coord_z = world_z * 0.1 * params.base_frequency;
+    // Sample noise at fixed torus position (NOT camera-dependent!)
+    // This creates a static terrain that the camera orbits around
+    let base_coord_x = pos_x * 0.1 * params.base_frequency;
+    let base_coord_z = pos_z * 0.1 * params.base_frequency;
     let base_height = simplex3d(vec3<f32>(base_coord_x, base_coord_z, 0.0)) * params.base_amplitude;
 
-    // Sample detail layer at world coordinates
-    let detail_coord_x = world_x * 0.1 * params.detail_frequency;
-    let detail_coord_z = world_z * 0.1 * params.detail_frequency;
-    let detail_height = simplex3d(vec3<f32>(detail_coord_x, detail_coord_z, params.time)) * params.detail_amplitude;
+    // Sample detail layer at fixed torus position
+    let detail_coord_x = pos_x * 0.1 * params.detail_frequency;
+    let detail_coord_z = pos_z * 0.1 * params.detail_frequency;
+    let detail_height = simplex3d(vec3<f32>(detail_coord_x, detail_coord_z, 0.0)) * params.detail_amplitude;
 
     // Combine layers
     let height = base_height + detail_height;
 
-    // Write camera-relative position (dx, dz) not world position
-    vertices[idx].position = vec3<f32>(dx, height, dz);
+    // Write fixed torus position (terrain is static, camera moves)
+    vertices[idx].position = vec3<f32>(pos_x, height, pos_z);
     vertices[idx].uv = vec2<f32>(f32(x) / f32(grid_size), f32(z) / f32(grid_size));
 }

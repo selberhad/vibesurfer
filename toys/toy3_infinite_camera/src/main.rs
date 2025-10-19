@@ -125,7 +125,7 @@ struct App {
 impl App {
     async fn new(window: Arc<Window>) -> Self {
         let size = window.inner_size();
-        let grid_size = 512u32; // Medium scale: 262,144 vertices
+        let grid_size = 256u32; // Small scale: 65,536 vertices (512m torus extent)
         let vertex_count = grid_size * grid_size;
 
         // Initialize wgpu
@@ -362,11 +362,18 @@ impl App {
 
         // Initialize camera (perspective view)
         let aspect = size.width as f32 / size.height as f32;
-        let view_proj = create_perspective_view_proj_matrix(aspect);
+        let torus_extent = 2.0 * grid_size as f32; // grid_spacing * grid_size
+        let view_proj = create_perspective_view_proj_matrix([0.0, 0.0, 0.0], torus_extent, aspect);
         queue.write_buffer(
             &camera_buffer,
             0,
-            bytemuck::bytes_of(&CameraUniforms { view_proj }),
+            bytemuck::bytes_of(&CameraUniforms {
+                view_proj,
+                camera_pos: [0.0, 0.0, 0.0],
+                _padding: 0.0,
+                torus_extent,
+                _padding2: [0.0, 0.0, 0.0],
+            }),
         );
 
         // Generate index buffer for wireframe triangles
@@ -463,13 +470,21 @@ impl App {
             );
         }
 
-        // Update camera matrix (only needs to update on window resize, but doing each frame is fine)
+        // Update camera matrix based on camera world position
         let aspect = self.size.width as f32 / self.size.height as f32;
-        let view_proj = create_perspective_view_proj_matrix(aspect);
+        let torus_extent = 2.0 * self.grid_size as f32; // grid_spacing * grid_size
+        let view_proj =
+            create_perspective_view_proj_matrix(self.camera.position, torus_extent, aspect);
         self.queue.write_buffer(
             &self.camera_buffer,
             0,
-            bytemuck::bytes_of(&CameraUniforms { view_proj }),
+            bytemuck::bytes_of(&CameraUniforms {
+                view_proj,
+                camera_pos: self.camera.position,
+                _padding: 0.0,
+                torus_extent,
+                _padding2: [0.0, 0.0, 0.0],
+            }),
         );
 
         // Update terrain parameters with audio modulation
