@@ -137,15 +137,11 @@ pub fn create_perspective_view_proj_matrix(
     // Use glam for correct matrix math - proven implementation
     use glam::{Mat4, Vec3};
 
-    // Wrap camera position to torus space (like orbiting a donut in 3ds Max)
-    let torus_x = camera_pos[0].rem_euclid(torus_extent);
-    let torus_z = camera_pos[2].rem_euclid(torus_extent);
-
-    // Camera position in torus space, 80m above terrain
-    let eye = Vec3::new(torus_x, 80.0, torus_z);
+    // Camera at unwrapped world position, 80m above terrain
+    // Vertex shader will handle wrapping vertices to torus space
+    let eye = Vec3::new(camera_pos[0], 80.0, camera_pos[2]);
 
     // Look direction: straight ahead (forward in Z)
-    // Use unwrapped target to avoid seam when crossing torus boundary
     let forward = Vec3::new(0.0, -60.0, 300.0).normalize(); // Look ahead and slightly down
     let target = eye + forward * 300.0; // 300m ahead
 

@@ -1,6 +1,6 @@
 # Lines of Code Report
 
-**Last Updated**: 2025-10-18 20:48
+**Last Updated**: 2025-10-18 21:00
 **Tool**: [cloc](https://github.com/AlDanial/cloc) + wc
 
 ---
@@ -9,13 +9,13 @@
 
 | Metric | Rust Code | Documentation (.md) | Total |
 |--------|-----------|---------------------|-------|
-| **Lines** | 1,728 | 9,065 | 10,793 |
+| **Lines** | 1,728 | 9,088 | 10,816 |
 | **Comments** | 410 | - | 410 |
 | **Blank Lines** | 383 | - | 383 |
-| **Total Lines** | 2,521 | 9,065 | 11,586 |
+| **Total Lines** | 2,521 | 9,088 | 11,609 |
 | **Files** | 18 | 28 | 46 |
 
-**Documentation Ratio**: 5.25 lines of docs per line of code
+**Documentation Ratio**: 5.26 lines of docs per line of code
 
 ---
 
@@ -77,7 +77,7 @@ SUM:                            22            468            463           2002
 | `learnings/wgpu_compute_integration.md` | 736 |
 | `learnings/wgsl_compute_patterns.md` | 559 |
 | `LEXICON.md` | 84 |
-| `LOC_REPORT.md` | 116 |
+| `LOC_REPORT.md` | 118 |
 | `README.md` | 124 |
 | `REFACTOR_PLAN.md` | 391 |
 | `STUDY_PLAN.md` | 255 |
@@ -87,10 +87,10 @@ SUM:                            22            468            463           2002
 | `toys/toy2_gpu_terrain_pipeline/.ddd/LEARNINGS.md` | 209 |
 | `toys/toy2_gpu_terrain_pipeline/.ddd/PLAN.md` | 553 |
 | `toys/toy2_gpu_terrain_pipeline/.ddd/SPEC.md` | 349 |
-| `toys/toy3_infinite_camera/.ddd/LEARNINGS.md` | 299 |
+| `toys/toy3_infinite_camera/.ddd/LEARNINGS.md` | 304 |
 | `toys/toy3_infinite_camera/.ddd/PLAN.md` | 384 |
 | `toys/toy3_infinite_camera/.ddd/SPEC.md` | 347 |
-| `toys/toy3_infinite_camera/MATH_REVIEW.md` | 377 |
+| `toys/toy3_infinite_camera/MATH_REVIEW.md` | 393 |
 | `VISION.md` | 50 |
 
 ---
@@ -99,7 +99,7 @@ SUM:                            22            468            463           2002
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| Docs/Code Ratio | ≥0.3 | 5.25 | ✅ Excellent |
+| Docs/Code Ratio | ≥0.3 | 5.26 | ✅ Excellent |
 | README exists | Yes | ✅ | Met |
 | ARCHITECTURE.md | Optional | ✅ | Optional |
 

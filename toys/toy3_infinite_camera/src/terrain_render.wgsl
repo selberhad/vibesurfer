@@ -23,14 +23,17 @@ struct CameraUniforms {
 fn vs_main(in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
 
-    // Toroidal wrapping: position vertices relative to camera
-    // This creates seamless infinite terrain by replicating the torus
-    let torus_camera_x = camera.camera_pos.x - floor(camera.camera_pos.x / camera.torus_extent) * camera.torus_extent;
-    let torus_camera_z = camera.camera_pos.z - floor(camera.camera_pos.z / camera.torus_extent) * camera.torus_extent;
+    // Toroidal wrapping: map torus-space vertex to nearest position relative to camera
+    // Vertices are at torus positions (0 to torus_extent)
+    // Camera is at unwrapped world position
 
-    // Calculate offset from camera (with wrapping for shortest distance)
-    var dx = in.position.x - torus_camera_x;
-    var dz = in.position.z - torus_camera_z;
+    // Wrap camera to torus space to find which "tile" we're on
+    let camera_torus_x = camera.camera_pos.x - floor(camera.camera_pos.x / camera.torus_extent) * camera.torus_extent;
+    let camera_torus_z = camera.camera_pos.z - floor(camera.camera_pos.z / camera.torus_extent) * camera.torus_extent;
+
+    // Calculate offset from camera (torus space)
+    var dx = in.position.x - camera_torus_x;
+    var dz = in.position.z - camera_torus_z;
 
     // Wrap to nearest distance
     let half_extent = camera.torus_extent * 0.5;
@@ -39,8 +42,12 @@ fn vs_main(in: VertexInput) -> VertexOutput {
     if (dz > half_extent) { dz -= camera.torus_extent; }
     if (dz < -half_extent) { dz += camera.torus_extent; }
 
-    // Position relative to camera (unwrapped world space)
-    let world_pos = vec3<f32>(torus_camera_x + dx, in.position.y, torus_camera_z + dz);
+    // Unwrapped world position (what the camera actually sees)
+    let world_pos = vec3<f32>(
+        camera.camera_pos.x + dx,
+        in.position.y,
+        camera.camera_pos.z + dz
+    );
 
     out.clip_position = camera.view_proj * vec4<f32>(world_pos, 1.0);
     out.uv = in.uv;

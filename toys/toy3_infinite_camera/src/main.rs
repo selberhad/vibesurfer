@@ -125,7 +125,7 @@ struct App {
 impl App {
     async fn new(window: Arc<Window>) -> Self {
         let size = window.inner_size();
-        let grid_size = 256u32; // Small scale: 65,536 vertices (512m torus extent)
+        let grid_size = 1024u32; // Large scale: 1,048,576 vertices (2048m torus extent)
         let vertex_count = grid_size * grid_size;
 
         // Initialize wgpu
