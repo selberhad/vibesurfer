@@ -1,6 +1,6 @@
 # Lines of Code Report
 
-**Last Updated**: 2025-10-18 21:00
+**Last Updated**: 2025-10-18 21:11
 **Tool**: [cloc](https://github.com/AlDanial/cloc) + wc
 
 ---
@@ -9,13 +9,13 @@
 
 | Metric | Rust Code | Documentation (.md) | Total |
 |--------|-----------|---------------------|-------|
-| **Lines** | 1,728 | 9,088 | 10,816 |
+| **Lines** | 1,728 | 9,263 | 10,991 |
 | **Comments** | 410 | - | 410 |
 | **Blank Lines** | 383 | - | 383 |
-| **Total Lines** | 2,521 | 9,088 | 11,609 |
-| **Files** | 18 | 28 | 46 |
+| **Total Lines** | 2,521 | 9,263 | 11,784 |
+| **Files** | 18 | 29 | 47 |
 
-**Documentation Ratio**: 5.26 lines of docs per line of code
+**Documentation Ratio**: 5.36 lines of docs per line of code
 
 ---
 
@@ -91,6 +91,7 @@ SUM:                            22            468            463           2002
 | `toys/toy3_infinite_camera/.ddd/PLAN.md` | 384 |
 | `toys/toy3_infinite_camera/.ddd/SPEC.md` | 347 |
 | `toys/toy3_infinite_camera/MATH_REVIEW.md` | 393 |
+| `toys/toy4_spherical_chunks/.ddd/SPEC.md` | 175 |
 | `VISION.md` | 50 |
 
 ---
@@ -99,7 +100,7 @@ SUM:                            22            468            463           2002
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| Docs/Code Ratio | ≥0.3 | 5.26 | ✅ Excellent |
+| Docs/Code Ratio | ≥0.3 | 5.36 | ✅ Excellent |
 | README exists | Yes | ✅ | Met |
 | ARCHITECTURE.md | Optional | ✅ | Optional |
 
