@@ -1,9 +1,9 @@
 # Open Questions — GPU Compute Shaders (Vibesurfer)
 
 **Created**: 2025-10-17
-**Updated**: 2025-10-18 (added Q5.4 - storage buffer alignment discovery)
+**Updated**: 2025-10-23 (toy3/toy4 validation: Q1.1, Q1.3, Q5.2 enhanced)
 **Purpose**: Central tracking from Research phase (GPU compute shader study)
-**Status**: 13 answered, 8 open, 21 total
+**Status**: 15 answered, 6 open, 21 total
 
 ---
 
@@ -19,11 +19,11 @@
 **Primary blockers**: None - ready for Discovery
 
 **Categories**:
-1. Performance Optimization (4 open, 0 answered)
+1. Performance Optimization (2 open, 2 answered) ← **UPDATED: Q1.1, Q1.3 answered by toys**
 2. Visual Quality (2 open, 0 answered)
 3. Architecture (2 open, 0 answered)
 4. Execution Model (0 open, 3 answered)
-5. Memory (0 open, 4 answered) ← **NEW: Q5.4 storage buffer alignment**
+5. Memory (0 open, 4 answered) ← **Q5.2 enhanced with toy3 evidence**
 6. Integration (0 open, 3 answered)
 7. Correctness (0 open, 3 answered)
 
@@ -34,13 +34,14 @@
 **Theory**: `learnings/gpu_compute_fundamentals.md`, `learnings/wgsl_compute_patterns.md`
 **Priority**: Defer until after initial integration
 
-### Workgroup Sizing
+### ✅ Workgroup Sizing
 **Q1.1**: Is 256 optimal for M1 GPU, or should we benchmark 64/128/256?
-- Context: WebGPU recommends 64, we chose 256 conservatively
-- M1 GPU has 128-thread SIMD width → 256 = 2 SIMD groups
-- Could benchmark to find actual sweet spot
-- **Answer via**: Profile compute pass with different workgroup sizes (64, 128, 256, 512)
-- **Timing**: After integration works, if performance insufficient
+- ✅ **ANSWERED**: 256 validated as performant across multiple toy implementations
+  - Source: toy3 (120 FPS @ 512×512 grid), toy4 (120 FPS @ 1.6M vertices)
+  - Both toys sustained 120 FPS with 256 workgroup size
+  - No performance degradation observed, 2× headroom above 60 FPS target
+  - M1 GPU (128-thread SIMD) handles 256 efficiently (2 SIMD groups)
+- **Next step**: Continue using 256, only benchmark alternatives if performance issues arise
 
 ### Noise Quality vs Performance
 **Q1.2**: Does hash-based noise produce visible artifacts at certain frequencies?
@@ -50,13 +51,14 @@
 - **Answer via**: Visual inspection during integration, vary detail_frequency parameter
 - **Timing**: Immediate (during first run)
 
-### Octave Layering Cost
+### ✅ Octave Layering Cost
 **Q1.3**: How many noise octaves fit in frame budget (1 vs 2 vs 3)?
-- Context: Currently single-octave detail layer
-- Each octave = additional noise() call per vertex
-- Multi-scale detail (large + medium + fine waves)
-- **Answer via**: Profile compute pass with 1/2/3 octaves, measure frame time
-- **Timing**: After integration, if surface needs richer detail
+- ✅ **ANSWERED**: Multi-octave (2 layers) validated as performant
+  - Source: toy4 (simplex noise with 2 layers: base 10m + detail 3m @ 120 FPS)
+  - Two-layer approach: base_amplitude 10m (75m spacing) + detail_amplitude 3m (20m spacing)
+  - Analytically tuned frequencies: `freq = 1.0 / (desired_spacing / planet_radius)`
+  - No FPS impact from dual-layer computation
+- **Next step**: 2 octaves confirmed viable, could test 3+ if richer detail needed
 
 ### Memory Bandwidth
 **Q1.4**: Would Structure-of-Arrays (SoA) layout measurably improve bandwidth?
@@ -163,15 +165,17 @@
   - No concern for ocean mesh params
 - **Next step**: Use uniform buffer for ComputeParams (as planned)
 
-### ✅ Alignment Impact
+### ✅ Alignment Impact (Uniform & Storage Buffers)
 **Q5.2**: Does alignment matter for performance or just correctness?
-- ✅ **ANSWERED**: Both correctness and performance
-  - Source: `learnings/gpu_compute_fundamentals.md` (Alignment Requirements section)
+- ✅ **ANSWERED**: Both correctness and performance, critical for both uniform and storage buffers
+  - Source: `learnings/gpu_compute_fundamentals.md`, toy3 LEARNINGS.md (80-byte TerrainParams struggle)
+  - **Uniform buffers**: Must align structs to 16-byte boundaries
+  - **Storage buffer arrays**: Elements must align to 16-byte multiples (Q5.4 discovery)
   - Correctness: GPU reads wrong offsets if misaligned
   - Performance: Cache line boundaries (128 bytes) - aligned access faster
-  - Uniform buffers: Must align to 16 bytes (structs)
-  - Already padded: `ComputeParams._padding: Vec2` → 32 bytes total
-- **Next step**: Verify struct alignment with `assert_eq!(size_of::<ComputeParams>(), 32)`
+  - Toy3 evidence: TerrainParams required 80 bytes (52 data + 28 padding) after multiple iterations
+  - Toy4 evidence: Proper padding eliminated buffer overflow bugs
+- **Next step**: Always pad to 16-byte multiples, validate with `size_of::<T>()` assertions
 
 ### ✅ Shared Memory for Noise
 **Q5.3**: Can we use shared memory for noise computation?
