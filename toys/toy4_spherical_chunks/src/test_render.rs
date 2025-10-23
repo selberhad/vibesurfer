@@ -174,7 +174,7 @@ async fn render_frame(camera_angle: f32, chunk_size: u32) {
         toy4_spherical_chunks::DEFAULT_ALTITUDE,
         camera_angle,
     );
-    let camera_uniforms = camera.camera_uniforms(WIDTH as f32 / HEIGHT as f32);
+    let camera_uniforms = camera.camera_uniforms(WIDTH as f32 / HEIGHT as f32, false);
 
     let camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Camera Buffer"),

@@ -108,64 +108,46 @@ for id in needed_chunks {
 - Normal calculation in compute shader adds zero overhead (computed once per chunk)
 - Validates "GPU compute is effectively free" at this scale
 
-**Known issue: Black stripe artifacts at chunk boundaries**
+**Chunk seam problem - SOLVED with integer-based grid coordinates**
 
-**Root cause identified:** Sub-pixel gaps between independently-generated chunks
-- Each chunk generates 256×256 grid with its own coordinate system
-- Edge vertices in adjacent chunks calculate positions using different math (different chunk centers)
-- Floating-point precision differences create tiny gaps (< 1 pixel)
-- Gaps invisible with wireframe rendering (only edges visible)
-- Gaps show as black stripes with solid surface rendering (background shows through)
+**Root cause:** Sub-pixel gaps between independently-generated chunks
+- Each chunk generated vertices using its own `chunk_center_lon` (float)
+- Edge vertices in adjacent chunks used different floating-point calculation paths
+- `chunk_corner = center - offset` accumulated different rounding errors per chunk
+- Result: Tiny gaps (< 1 pixel) visible as black stripes with solid surfaces
 
-**What DIDN'T work:**
-1. ❌ Disabling backface culling - Stripes persist (not a culling issue)
-2. ❌ Analytical sphere normals (`normalize(position)`) - Stripes persist (not a normal calculation issue)
-3. ❌ Finite difference normals with neighbor access - Stripes persist (normals are consistent)
-4. ❌ 0.5 cell grid offset for overlap - Stripes persist (chunks still use different centers)
-5. ❌ Global grid alignment from chunk corner - Stripes persist (floating-point still differs)
+**Solution: Integer-based global grid coordinates**
+- Changed `SphereParams` to use `chunk_origin_lon_cell` / `chunk_origin_lat_cell` (i32)
+- Each chunk calculates: `global_cell = chunk_origin_cell + local_vertex_index`
+- Convert to world space meters: `world_pos = f32(global_cell) * grid_spacing`
+- Then to spherical coordinates: `lon = world_pos / planet_radius`
+- **Key:** All chunks use identical math for vertices at same global coordinate
 
-**Why approaches failed:**
-- Each chunk uses `params.chunk_center_lon` to calculate all positions
-- Even with identical grid coordinates, different centers → different floating-point paths
-- `chunk_corner = center - offset` still accumulates different rounding errors per chunk
+**Why it works:**
+- Edge vertex at global coordinate (255, 0) is ALWAYS calculated the same way
+- No matter which chunk (lon_cell=0 or lon_cell=1), formula is identical
+- Integer addition before float conversion eliminates precision differences
+- Bitwise-identical positions guaranteed for shared edges
 
-**Potential solutions for future sessions:**
+**Implementation:**
+- `Chunk::create()` calculates `chunk_origin_lon_cell = lon_cell * (chunk_size - 1)`
+- Compute shader: `global_x = params.chunk_origin_lon_cell + i32(gx)`
+- Zero performance cost: int addition vs float multiply/add is negligible on GPU
+- No architectural complexity: chunks remain independent
 
-1. **Shared vertex buffer approach**
-   - Create single global vertex buffer for all chunks
-   - Each chunk references subset of vertices (no duplication at edges)
-   - Requires: Global index mapping, more complex memory management
-   - Benefit: Guaranteed identical edge vertices (same memory location)
+**Debug visualization:**
+- Added `debug_chunk_boundaries` flag to `CameraUniforms` (u32: 0=off, 1=on)
+- Red chunk borders render only when flag enabled
+- Default: false (seamless surface)
+- Easy to enable for debugging future streaming issues
 
-2. **Explicit stitching with neighbor data**
-   - Pass neighbor chunk centers to compute shader
-   - Edge vertices query: "am I on boundary? Use neighbor's calculation"
-   - Requires: ChunkId-aware compute shader, neighbor lookup
-   - Benefit: Deterministic edge matching
-
-3. **Integer-based grid coordinates**
-   - Use global integer grid (lat_cell, lon_cell, grid_x, grid_z)
-   - Convert to float only for final sphere projection
-   - Minimizes floating-point accumulation differences
-   - Benefit: Bitwise-identical edge calculations
-
-4. **Accept artifacts, mask with rendering**
-   - Slightly thicken wireframe at chunk boundaries to cover gaps
-   - Or: use fog/depth bias to hide seams
-   - Benefit: Simple, no architectural changes
-   - Downside: Doesn't fix root cause
-
-5. **Increase chunk overlap to 1+ vertices**
-   - Generate 257×257 vertices (not 256×256)
-   - Render only interior 255×255 (skip edges)
-   - Neighboring chunks' interiors overlap by 1 vertex
-   - Benefit: Redundant calculation guarantees coverage
-   - Downside: 2% vertex overhead, z-fighting at overlaps
-
-**Recommended next step:** Implement approach #1 (shared vertex buffer) - the architecturally correct solution that guarantees perfect edge matching through shared memory.
+**Result:**
+- ✅ Seamless chunk boundaries - no visible gaps
+- ✅ 120 FPS unchanged (zero performance impact)
+- ✅ Clean, simple solution (no shared buffer complexity)
+- ✅ Chunks remain fully independent (easy streaming)
 
 ## Open Questions
 - Does chunk grid need latitude expansion at higher latitudes? (Currently only longitude streaming)
 - What's the minimum chunk resolution before terrain aliasing becomes visible?
 - Can noise be computed in vertex shader instead of compute shader? (Would simplify but might hit performance limit)
-- Would integer-based grid coordinates eliminate floating-point precision gaps?

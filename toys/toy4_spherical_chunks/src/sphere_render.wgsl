@@ -3,7 +3,7 @@
 struct CameraUniforms {
     view_proj: mat4x4<f32>,
     camera_pos: vec3<f32>,
-    _padding: f32,
+    debug_chunk_boundaries: u32,  // 0 = off, 1 = on
 }
 
 struct VertexInput {
@@ -43,11 +43,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let diffuse = max(dot(normal, light_dir), 0.0);
     let lighting = 0.2 + 0.8 * diffuse;
 
-    // Debug: Chunk boundary detection
-    let chunk_edge_x = step(in.uv.x, 0.01) + step(0.99, in.uv.x);
-    let chunk_edge_y = step(in.uv.y, 0.01) + step(0.99, in.uv.y);
-    let chunk_boundary = clamp(chunk_edge_x + chunk_edge_y, 0.0, 1.0);
-
     // Dark teal surface
     let surface_color = vec3<f32>(0.0, 0.15, 0.2) * lighting;
 
@@ -60,10 +55,16 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let wireframe = clamp(edge, 0.0, 1.0);
     let wireframe_color = vec3<f32>(0.0, 1.0, 1.0) * (0.5 + 0.5 * lighting);
 
-    // Red chunk boundaries
-    let boundary_color = vec3<f32>(1.0, 0.0, 0.0);
+    var base_color = mix(surface_color, wireframe_color, wireframe);
 
-    let base_color = mix(mix(surface_color, wireframe_color, wireframe), boundary_color, chunk_boundary);
+    // Debug: Chunk boundary visualization (red borders)
+    if (camera.debug_chunk_boundaries != 0u) {
+        let chunk_edge_x = step(in.uv.x, 0.01) + step(0.99, in.uv.x);
+        let chunk_edge_y = step(in.uv.y, 0.01) + step(0.99, in.uv.y);
+        let chunk_boundary = clamp(chunk_edge_x + chunk_edge_y, 0.0, 1.0);
+        let boundary_color = vec3<f32>(1.0, 0.0, 0.0);
+        base_color = mix(base_color, boundary_color, chunk_boundary);
+    }
 
     // Exponential fog
     let fog_factor = 1.0 - exp2(-0.015 * distance);

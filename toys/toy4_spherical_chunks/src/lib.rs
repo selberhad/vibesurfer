@@ -21,8 +21,8 @@ pub struct Vertex {
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct SphereParams {
     pub planet_radius: f32,
-    pub chunk_center_lat: f32,
-    pub chunk_center_lon: f32,
+    pub chunk_origin_lon_cell: i32, // Global grid cell X coordinate
+    pub chunk_origin_lat_cell: i32, // Global grid cell Z coordinate
     pub grid_size: u32,
     pub grid_spacing: f32,
     pub base_amplitude: f32,   // Height variation (meters)
@@ -39,7 +39,7 @@ pub struct SphereParams {
 pub struct CameraUniforms {
     pub view_proj: [[f32; 4]; 4],
     pub camera_pos: [f32; 3],
-    pub _padding: f32,
+    pub debug_chunk_boundaries: u32, // 0 = off, 1 = on
 }
 
 // === Chunk System ===
@@ -94,7 +94,7 @@ impl Chunk {
         id: ChunkId,
         chunk_size: u32,
         grid_spacing: f32,
-        chunk_angular_size: f32,
+        _chunk_angular_size: f32,
     ) -> Self {
         let vertex_count = chunk_size * chunk_size;
 
@@ -106,11 +106,18 @@ impl Chunk {
             mapped_at_creation: false,
         });
 
+        // Calculate global integer grid origin for this chunk
+        // Each chunk occupies (chunk_size - 1) grid cells in each dimension
+        // chunk_size = 256 means 255 cells (0-255 vertices = 255 cells)
+        let cells_per_chunk = (chunk_size - 1) as i32;
+        let chunk_origin_lon_cell = id.lon_cell * cells_per_chunk;
+        let chunk_origin_lat_cell = id.lat_cell * cells_per_chunk;
+
         // Create sphere params for this chunk
         let sphere_params = SphereParams {
             planet_radius: PLANET_RADIUS,
-            chunk_center_lat: 0.0,
-            chunk_center_lon: id.center_lon(chunk_angular_size),
+            chunk_origin_lon_cell,
+            chunk_origin_lat_cell,
             grid_size: chunk_size,
             grid_spacing,
             base_amplitude: 10.0,      // 10m height variation
@@ -248,12 +255,16 @@ impl OrbitCamera {
         ((proj * view).to_cols_array_2d(), pos)
     }
 
-    pub fn camera_uniforms(&self, aspect_ratio: f32) -> CameraUniforms {
+    pub fn camera_uniforms(
+        &self,
+        aspect_ratio: f32,
+        debug_chunk_boundaries: bool,
+    ) -> CameraUniforms {
         let (view_proj, pos) = self.view_proj_matrix(aspect_ratio);
         CameraUniforms {
             view_proj,
             camera_pos: [pos.x, pos.y, pos.z],
-            _padding: 0.0,
+            debug_chunk_boundaries: if debug_chunk_boundaries { 1 } else { 0 },
         }
     }
 }

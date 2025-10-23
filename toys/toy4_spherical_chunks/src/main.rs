@@ -352,7 +352,7 @@ impl App {
         // Update camera uniform using shared lib
         let aspect_ratio = self.size.width as f32 / self.size.height as f32;
         let lib_camera = self.camera.as_lib_camera();
-        let camera_uniforms = lib_camera.camera_uniforms(aspect_ratio);
+        let camera_uniforms = lib_camera.camera_uniforms(aspect_ratio, false);
         self.queue
             .write_buffer(&self.camera_buffer, 0, bytemuck::bytes_of(&camera_uniforms));
 

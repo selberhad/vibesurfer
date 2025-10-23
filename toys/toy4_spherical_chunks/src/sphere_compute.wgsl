@@ -11,8 +11,8 @@ struct Vertex {
 
 struct SphereParams {
     planet_radius: f32,
-    chunk_center_lat: f32,
-    chunk_center_lon: f32,
+    chunk_origin_lon_cell: i32,  // Global grid cell X coordinate
+    chunk_origin_lat_cell: i32,  // Global grid cell Z coordinate
     grid_size: u32,
     grid_spacing: f32,
     base_amplitude: f32,    // Height variation (meters)
@@ -111,31 +111,28 @@ fn simplex3d(v: vec3<f32>) -> f32 {
     return 42.0 * dot(m * m, vec4<f32>(dot(p0, x0), dot(p1, x1), dot(p2, x2), dot(p3, x3)));
 }
 
-// Helper: Calculate position aligned to global grid
-// Key: Use chunk_center as reference, but calculate positions in a way that
-// guarantees neighboring chunks produce identical edge vertices
+// Helper: Calculate position using global integer grid coordinates
+// Key: All chunks calculate positions from the same global grid origin
+// This guarantees bitwise-identical positions for edge vertices
 fn get_position(gx: u32, gz: u32) -> vec3<f32> {
-    // Calculate position relative to a global grid aligned to chunk boundaries
-    // This ensures edge vertices from adjacent chunks have identical coordinates
+    // Calculate GLOBAL grid coordinates (same for all chunks at this position)
+    let global_x = params.chunk_origin_lon_cell + i32(gx);
+    let global_z = params.chunk_origin_lat_cell + i32(gz);
 
-    // Chunk size in world space
-    let chunk_world_size = f32(params.grid_size - 1) * params.grid_spacing;
+    // Convert to world space meters (identical math for all chunks)
+    let world_x = f32(global_x) * params.grid_spacing;
+    let world_z = f32(global_z) * params.grid_spacing;
 
-    // Start from chunk's bottom-left corner (not center)
-    let chunk_corner_lon = params.chunk_center_lon - chunk_world_size * 0.5 / params.planet_radius;
-    let chunk_corner_lat = params.chunk_center_lat - chunk_world_size * 0.5 / params.planet_radius;
+    // Convert to spherical coordinates
+    let lon = world_x / params.planet_radius;
+    let lat = world_z / params.planet_radius;
 
-    // Calculate world position from corner
-    let world_x = f32(gx) * params.grid_spacing;
-    let world_z = f32(gz) * params.grid_spacing;
-
-    let lon = chunk_corner_lon + world_x / params.planet_radius;
-    let lat = chunk_corner_lat + world_z / params.planet_radius;
-
+    // Sample noise at global coordinates
     let base_noise = simplex3d(vec3<f32>(lon * params.base_frequency, lat * params.base_frequency, 0.0));
     let detail_noise = simplex3d(vec3<f32>(lon * params.detail_frequency, lat * params.detail_frequency, 100.0));
     let height = base_noise * params.base_amplitude + detail_noise * params.detail_amplitude;
 
+    // Project to sphere surface
     let r = params.planet_radius + height;
     return vec3<f32>(r * cos(lat) * cos(lon), r * sin(lat), r * cos(lat) * sin(lon));
 }
