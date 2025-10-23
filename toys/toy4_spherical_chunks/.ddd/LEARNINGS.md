@@ -147,42 +147,51 @@ for id in needed_chunks {
 - ✅ Clean, simple solution (no shared buffer complexity)
 - ✅ Chunks remain fully independent (easy streaming)
 
-## Wireframe Rendering Artifacts (UNRESOLVED)
+## Wireframe Rendering Artifacts (SOLVED)
 
-**Problem:** Moiré/aliasing patterns visible at chunk boundaries, oscillating with camera position.
+**Problem:** Moiré/aliasing patterns visible at chunk boundaries, oscillating with camera position ("sweeping effect").
 
-**Observations:**
-- Artifact appears around chunk seams (confirmed with debug red boundaries)
-- Oscillates with camera lateral movement (50m sine wave oscillation)
-- Not related to chunk loading (happens with static 3×3 grid)
-- Not related to fog, lighting, or backface culling
-- Artifact "hovers around" the seam line based on viewing angle
+**Root cause:** Double-drawn edge lines at chunk boundaries creating z-fighting
+- Each chunk generated line indices for ALL grid positions (x=0 to x=255, z=0 to z=255)
+- Adjacent chunks' edge lines overlapped at same world position
+- Example: Chunk A's right edge (x=255) and Chunk B's left edge (x=0) at same position
+- Two identical lines rendered → z-fighting with tiny depth differences
+- **Fog amplified the artifact**: slight depth differences → different fog values → visible flickering
 
-**Root cause:** Fragment shader-based wireframe rendering suffers from precision/aliasing issues.
+**Investigation path (false starts):**
+1. ❌ Fragment shader wireframe with `fract()` - created worse artifacts
+2. ❌ Anti-aliased wireframe using `fwidth` and `smoothstep` - no improvement
+3. ❌ Vertex attribute `grid_coord` to avoid per-fragment calculations - still had artifacts
+4. ❌ Integer grid cell coordinates - marginal improvement
+5. ❌ Coarser grid spacing (10m vs 2m) - just made grid uglier
+6. ✅ **Noticed artifact was much worse WITH fog than without** → key insight
+7. ✅ Realized LineList topology was double-drawing edges → **solution found**
 
-**Attempted fixes:**
-1. ❌ Anti-aliased wireframe using `fwidth` and `smoothstep` - no improvement
-2. ❌ Vertex attribute `grid_coord` to avoid per-fragment lat/lon calculation - still has artifacts
-3. ❌ Direct integer grid cell coordinates (avoid lat/lon roundtrip) - marginal improvement at best
-4. ❌ Coarser grid spacing (10m vs 2m) - just makes grid uglier, artifacts persist
-5. ❌ Backface culling enabled/disabled - no effect
+**Solution: Skip overlapping edge lines**
+- Modified `generate_grid_indices()` to skip left and top edges
+- Horizontal lines: `for z in 1..grid_size` (skip z=0)
+- Vertical lines: `for x in 1..grid_size` (skip x=0)
+- Each chunk only draws its "interior + right + bottom" edges
+- Adjacent chunks' interior lines meet seamlessly at boundaries with no overlap
 
-**Current implementation:**
-- Integer grid cell indices stored in vertex attributes (`grid_coord`)
-- Rasterizer interpolates these across triangles
-- Fragment shader uses `fract(grid_coord)` to detect grid lines
-- Smoothstep anti-aliasing with fwidth derivatives
+**Why it works:**
+- Chunk A draws lines at x=1 through x=255
+- Chunk B draws lines at x=1 through x=255 (in its local space = global x=256 through x=510)
+- No overlap, no z-fighting, no artifacts
+- Fog now renders consistently (no depth ambiguity)
 
-**Hypothesis:** The fundamental issue is that fragment shader-based wireframe rendering using `fract()` and distance fields creates aliasing when:
-- Grid coordinates are interpolated across triangles at chunk boundaries
-- Camera viewing angle causes precision issues in interpolated values
-- `fract()` amplifies tiny floating-point differences
+**Implementation:**
+- Reverted from TriangleList (lit surface experiment) back to LineList
+- Simple fragment shader: wireframe color + exponential fog
+- Removed all complex fragment shader wireframe logic
 
-**Possible solutions not yet tried:**
-- Render wireframe as actual line geometry (LineList topology) - proper but requires separate render pass
-- Accept that fragment-based wireframe has inherent limitations at certain viewing angles
+**Result:**
+- ✅ Wireframe artifacts eliminated
+- ✅ Clean rendering with fog enabled
+- ✅ 120 FPS maintained
+- ✅ Seamless chunk boundaries
 
-**Status:** Documented as known issue. Wireframe is functional but has visual artifacts at chunk boundaries under certain camera angles. Not a blocker for gameplay.
+**Key learning:** Z-fighting from overlapping geometry is amplified by fog calculations. Always check for double-drawn geometry at chunk boundaries.
 
 ## Camera Lateral Oscillation (for testing)
 
@@ -201,4 +210,3 @@ for id in needed_chunks {
 - Does chunk grid need latitude expansion at higher latitudes? (Currently only longitude streaming)
 - What's the minimum chunk resolution before terrain aliasing becomes visible?
 - Can noise be computed in vertex shader instead of compute shader? (Would simplify but might hit performance limit)
-- Should wireframe be rendered as actual line geometry to eliminate artifacts?
