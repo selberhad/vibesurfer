@@ -1,6 +1,6 @@
 # Lines of Code Report
 
-**Last Updated**: 2025-10-18 22:10
+**Last Updated**: 2025-10-23 14:34
 **Tool**: [cloc](https://github.com/AlDanial/cloc) + wc
 
 ---
@@ -9,13 +9,13 @@
 
 | Metric | Rust Code | Documentation (.md) | Total |
 |--------|-----------|---------------------|-------|
-| **Lines** | 1,728 | 9,438 | 11,166 |
+| **Lines** | 1,728 | 9,488 | 11,216 |
 | **Comments** | 410 | - | 410 |
 | **Blank Lines** | 383 | - | 383 |
-| **Total Lines** | 2,521 | 9,438 | 11,959 |
+| **Total Lines** | 2,521 | 9,488 | 12,009 |
 | **Files** | 18 | 30 | 48 |
 
-**Documentation Ratio**: 5.46 lines of docs per line of code
+**Documentation Ratio**: 5.49 lines of docs per line of code
 
 ---
 
@@ -77,7 +77,7 @@ SUM:                            22            468            463           2002
 | `learnings/wgpu_compute_integration.md` | 736 |
 | `learnings/wgsl_compute_patterns.md` | 559 |
 | `LEXICON.md` | 84 |
-| `LOC_REPORT.md` | 119 |
+| `LOC_REPORT.md` | 120 |
 | `README.md` | 124 |
 | `REFACTOR_PLAN.md` | 391 |
 | `STUDY_PLAN.md` | 255 |
@@ -91,7 +91,7 @@ SUM:                            22            468            463           2002
 | `toys/toy3_infinite_camera/.ddd/PLAN.md` | 384 |
 | `toys/toy3_infinite_camera/.ddd/SPEC.md` | 347 |
 | `toys/toy3_infinite_camera/MATH_REVIEW.md` | 393 |
-| `toys/toy4_spherical_chunks/.ddd/LEARNINGS.md` | 174 |
+| `toys/toy4_spherical_chunks/.ddd/LEARNINGS.md` | 223 |
 | `toys/toy4_spherical_chunks/.ddd/SPEC.md` | 175 |
 | `VISION.md` | 50 |
 
@@ -101,7 +101,7 @@ SUM:                            22            468            463           2002
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| Docs/Code Ratio | ≥0.3 | 5.46 | ✅ Excellent |
+| Docs/Code Ratio | ≥0.3 | 5.49 | ✅ Excellent |
 | README exists | Yes | ✅ | Met |
 | ARCHITECTURE.md | Optional | ✅ | Optional |
 

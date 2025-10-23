@@ -166,38 +166,12 @@ async fn render_frame(camera_angle: f32, chunk_size: u32) {
         chunk_angular_size,
     );
 
-    // Create camera
-    let altitude = 100.0;
-    let r = PLANET_RADIUS + altitude;
-    let lat = 0.0_f32;
-    let lon = camera_angle;
-
-    let camera_pos = glam::Vec3::new(
-        r * lat.cos() * lon.cos(),
-        r * lat.sin(),
-        r * lat.cos() * lon.sin(),
+    // Create camera using shared lib (ensures same altitude/orientation as main.rs)
+    let camera = toy4_spherical_chunks::OrbitCamera::at_angle(
+        toy4_spherical_chunks::DEFAULT_ALTITUDE,
+        camera_angle,
     );
-
-    // Look ahead along the orbital path (300m forward on the sphere surface)
-    let look_ahead_meters = 300.0;
-    let look_ahead_angle = camera_angle + look_ahead_meters / PLANET_RADIUS;
-
-    let look_at = glam::Vec3::new(
-        PLANET_RADIUS * look_ahead_angle.cos(),
-        0.0, // Same latitude (equator)
-        PLANET_RADIUS * look_ahead_angle.sin(),
-    );
-
-    let view_matrix = glam::Mat4::look_at_rh(camera_pos, look_at, glam::Vec3::Y);
-    let proj_matrix = glam::Mat4::perspective_rh(
-        60.0_f32.to_radians(),
-        WIDTH as f32 / HEIGHT as f32,
-        1.0,
-        2_000_000.0,
-    );
-    let view_proj = (proj_matrix * view_matrix).to_cols_array_2d();
-
-    let camera_uniforms = CameraUniforms { view_proj };
+    let camera_uniforms = camera.camera_uniforms(WIDTH as f32 / HEIGHT as f32);
 
     let camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Camera Buffer"),
@@ -207,26 +181,8 @@ async fn render_frame(camera_angle: f32, chunk_size: u32) {
     });
     queue.write_buffer(&camera_buffer, 0, bytemuck::bytes_of(&camera_uniforms));
 
-    // Create render pipeline
-    let render_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: Some("Render Shader"),
-        source: wgpu::ShaderSource::Wgsl(include_str!("sphere_render.wgsl").into()),
-    });
-
-    let camera_bind_group_layout =
-        device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Camera Bind Group Layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
-        });
+    // Create render pipeline using shared lib
+    let camera_bind_group_layout = toy4_spherical_chunks::create_camera_bind_group_layout(&device);
 
     let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("Camera Bind Group"),
@@ -237,64 +193,11 @@ async fn render_frame(camera_angle: f32, chunk_size: u32) {
         }],
     });
 
-    let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some("Render Pipeline Layout"),
-        bind_group_layouts: &[&camera_bind_group_layout],
-        push_constant_ranges: &[],
-    });
-
-    let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("Render Pipeline"),
-        layout: Some(&render_pipeline_layout),
-        vertex: wgpu::VertexState {
-            module: &render_shader,
-            entry_point: "vs_main",
-            buffers: &[wgpu::VertexBufferLayout {
-                array_stride: std::mem::size_of::<Vertex>() as u64,
-                step_mode: wgpu::VertexStepMode::Vertex,
-                attributes: &[
-                    wgpu::VertexAttribute {
-                        offset: 0,
-                        shader_location: 0,
-                        format: wgpu::VertexFormat::Float32x3,
-                    },
-                    wgpu::VertexAttribute {
-                        offset: 16,
-                        shader_location: 1,
-                        format: wgpu::VertexFormat::Float32x2,
-                    },
-                ],
-            }],
-            compilation_options: Default::default(),
-        },
-        fragment: Some(wgpu::FragmentState {
-            module: &render_shader,
-            entry_point: "fs_main",
-            targets: &[Some(wgpu::ColorTargetState {
-                format: wgpu::TextureFormat::Rgba8UnormSrgb,
-                blend: Some(wgpu::BlendState::REPLACE),
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
-            compilation_options: Default::default(),
-        }),
-        primitive: wgpu::PrimitiveState {
-            topology: wgpu::PrimitiveTopology::LineList,
-            strip_index_format: None,
-            front_face: wgpu::FrontFace::Ccw,
-            cull_mode: None,
-            polygon_mode: wgpu::PolygonMode::Fill,
-            unclipped_depth: false,
-            conservative: false,
-        },
-        depth_stencil: None,
-        multisample: wgpu::MultisampleState {
-            count: 1,
-            mask: !0,
-            alpha_to_coverage_enabled: false,
-        },
-        multiview: None,
-        cache: None,
-    });
+    let render_pipeline = toy4_spherical_chunks::create_render_pipeline(
+        &device,
+        &camera_bind_group_layout,
+        wgpu::TextureFormat::Rgba8UnormSrgb,
+    );
 
     // Render
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {

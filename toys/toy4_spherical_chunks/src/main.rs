@@ -12,8 +12,6 @@ use winit::{
 // === Configuration ===
 
 const DEFAULT_CHUNK_SIZE: u32 = 256; // 256x256 vertices per chunk
-const DEFAULT_ALTITUDE: f32 = 100.0; // 100m above surface
-const DEFAULT_SPEED: f32 = 100.0; // 100 m/s tangential velocity
 const DEFAULT_SPACING: f32 = 2.0; // 2m between vertices
 
 // === Orbital Camera ===
@@ -27,7 +25,6 @@ struct OrbitCamera {
 
 impl OrbitCamera {
     fn new(altitude: f32, speed_m_s: f32) -> Self {
-        // Convert linear speed to angular velocity: v = r * ω
         let r = PLANET_RADIUS + altitude;
         let angular_velocity = speed_m_s / r;
 
@@ -47,22 +44,16 @@ impl OrbitCamera {
     }
 
     fn position(&self) -> glam::Vec3 {
-        // Equatorial orbit (latitude = 0)
-        let r = PLANET_RADIUS + self.altitude;
-        let lat: f32 = 0.0;
-        let lon = self.angular_pos;
+        let lib_camera = self.as_lib_camera();
+        lib_camera.position()
+    }
 
-        // Spherical to Cartesian
-        glam::Vec3::new(
-            r * lat.cos() * lon.cos(),
-            r * lat.sin(),
-            r * lat.cos() * lon.sin(),
-        )
+    fn as_lib_camera(&self) -> toy4_spherical_chunks::OrbitCamera {
+        toy4_spherical_chunks::OrbitCamera::at_angle(self.altitude, self.angular_pos)
     }
 
     fn adjust_altitude(&mut self, delta: f32) {
-        self.altitude = (self.altitude + delta).max(1.0); // Min 1m altitude
-                                                          // Update angular velocity to maintain same linear speed
+        self.altitude = (self.altitude + delta).max(1.0);
         let linear_speed = self.angular_velocity * (PLANET_RADIUS + self.altitude - delta);
         self.angular_velocity = linear_speed / (PLANET_RADIUS + self.altitude);
         println!(
@@ -77,31 +68,6 @@ impl OrbitCamera {
         let new_speed = (current_speed + delta_m_s).max(1.0);
         self.angular_velocity = new_speed / (PLANET_RADIUS + self.altitude);
         println!("Orbital speed: {:.1} m/s", new_speed);
-    }
-
-    fn view_proj_matrix(&self, aspect_ratio: f32) -> [[f32; 4]; 4] {
-        let pos = self.position();
-
-        // Look ahead along the orbital path (300m forward on the sphere surface)
-        let look_ahead_meters = 300.0;
-        let look_ahead_angle = self.angular_pos + look_ahead_meters / PLANET_RADIUS;
-
-        // Look at point is on sphere surface, ahead along orbit
-        let look_at = glam::Vec3::new(
-            PLANET_RADIUS * look_ahead_angle.cos(),
-            0.0, // Same latitude (equator)
-            PLANET_RADIUS * look_ahead_angle.sin(),
-        );
-
-        let view = glam::Mat4::look_at_rh(pos, look_at, glam::Vec3::Y);
-        let proj = glam::Mat4::perspective_rh(
-            60.0_f32.to_radians(),
-            aspect_ratio,
-            1.0,
-            2_000_000.0, // Far plane beyond planet radius
-        );
-
-        (proj * view).to_cols_array_2d()
     }
 }
 
@@ -247,26 +213,9 @@ impl App {
             mapped_at_creation: false,
         });
 
-        // Create render pipeline
-        let render_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Render Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("sphere_render.wgsl").into()),
-        });
-
+        // Create render pipeline using shared lib
         let camera_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("Camera Bind Group Layout"),
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                }],
-            });
+            toy4_spherical_chunks::create_camera_bind_group_layout(&device);
 
         let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Camera Bind Group"),
@@ -277,65 +226,11 @@ impl App {
             }],
         });
 
-        let render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[&camera_bind_group_layout],
-                push_constant_ranges: &[],
-            });
-
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Render Pipeline"),
-            layout: Some(&render_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &render_shader,
-                entry_point: "vs_main",
-                buffers: &[wgpu::VertexBufferLayout {
-                    array_stride: std::mem::size_of::<Vertex>() as u64,
-                    step_mode: wgpu::VertexStepMode::Vertex,
-                    attributes: &[
-                        wgpu::VertexAttribute {
-                            offset: 0,
-                            shader_location: 0,
-                            format: wgpu::VertexFormat::Float32x3,
-                        },
-                        wgpu::VertexAttribute {
-                            offset: 16, // After position + padding
-                            shader_location: 1,
-                            format: wgpu::VertexFormat::Float32x2,
-                        },
-                    ],
-                }],
-                compilation_options: Default::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &render_shader,
-                entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: Default::default(),
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::LineList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: None,
-                polygon_mode: wgpu::PolygonMode::Fill,
-                unclipped_depth: false,
-                conservative: false,
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState {
-                count: 1,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            multiview: None,
-            cache: None,
-        });
+        let render_pipeline = toy4_spherical_chunks::create_render_pipeline(
+            &device,
+            &camera_bind_group_layout,
+            config.format,
+        );
 
         // Calculate chunk angular size
         let grid_spacing = DEFAULT_SPACING;
@@ -343,7 +238,10 @@ impl App {
         let chunk_angular_size = chunk_extent_meters / PLANET_RADIUS;
 
         // Create initial chunk at camera position
-        let camera = OrbitCamera::new(DEFAULT_ALTITUDE, DEFAULT_SPEED);
+        let camera = OrbitCamera::new(
+            toy4_spherical_chunks::DEFAULT_ALTITUDE,
+            toy4_spherical_chunks::DEFAULT_SPEED,
+        );
         let camera_chunk_id = ChunkId::from_camera_angle(camera.angular_pos, chunk_angular_size);
 
         let chunk = Chunk::create(
@@ -451,10 +349,10 @@ impl App {
     }
 
     fn render(&mut self) {
-        // Update camera uniform
+        // Update camera uniform using shared lib
         let aspect_ratio = self.size.width as f32 / self.size.height as f32;
-        let view_proj = self.camera.view_proj_matrix(aspect_ratio);
-        let camera_uniforms = CameraUniforms { view_proj };
+        let lib_camera = self.camera.as_lib_camera();
+        let camera_uniforms = lib_camera.camera_uniforms(aspect_ratio);
         self.queue
             .write_buffer(&self.camera_buffer, 0, bytemuck::bytes_of(&camera_uniforms));
 
