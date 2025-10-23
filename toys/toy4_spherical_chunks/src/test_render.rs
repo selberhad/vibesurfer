@@ -7,56 +7,61 @@ const HEIGHT: u32 = 720;
 
 fn main() {
     // Parse command line arguments
-    // Usage: test_render [start_angle] [end_angle] [step]
-    // Example: test_render 0 3.14 0.5  -> renders at 0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0
+    // Usage: test_render [start_time] [end_time] [step]
+    // Example: test_render 0 5 0.5  -> renders at t=0, 0.5, 1.0, 1.5, ... 5.0 seconds
     let args: Vec<String> = env::args().collect();
 
     let chunk_size = 256; // Fixed for now
 
-    let (start_angle, end_angle, step) = if args.len() >= 4 {
+    let (start_time, end_time, step) = if args.len() >= 4 {
         (
             args[1].parse::<f32>().unwrap_or(0.0),
-            args[2].parse::<f32>().unwrap_or(3.0),
+            args[2].parse::<f32>().unwrap_or(5.0),
             args[3].parse::<f32>().unwrap_or(0.5),
         )
     } else if args.len() == 2 {
-        // Single frame mode (backward compatibility)
-        let angle = args[1].parse::<f32>().unwrap_or(0.0);
-        (angle, angle, 1.0)
+        // Single frame mode
+        let time = args[1].parse::<f32>().unwrap_or(0.0);
+        (time, time, 1.0)
     } else {
-        // Default: render frames from 0 to 3 radians in 0.5 rad steps
-        (0.0, 3.0, 0.5)
+        // Default: render frames from 0 to 5 seconds in 0.5 second steps
+        (0.0, 5.0, 0.5)
     };
 
-    // Generate sequence of angles
-    let mut angles = Vec::new();
-    let mut angle = start_angle;
-    while angle <= end_angle + 0.001 {
+    // Generate sequence of time values
+    let mut times = Vec::new();
+    let mut time = start_time;
+    while time <= end_time + 0.001 {
         // Small epsilon for floating point comparison
-        angles.push(angle);
-        angle += step;
+        times.push(time);
+        time += step;
     }
 
     println!(
-        "Rendering {} frames from {:.3}rad to {:.3}rad (step: {:.3}rad)",
-        angles.len(),
-        start_angle,
-        end_angle,
+        "Rendering {} frames from {:.3}s to {:.3}s (step: {:.3}s)",
+        times.len(),
+        start_time,
+        end_time,
         step
     );
 
-    pollster::block_on(render_frames(angles, chunk_size));
+    pollster::block_on(render_frames(times, chunk_size));
 }
 
-async fn render_frames(angles: Vec<f32>, chunk_size: u32) {
-    for angle in angles {
-        render_frame(angle, chunk_size).await;
+async fn render_frames(times: Vec<f32>, chunk_size: u32) {
+    for time in times {
+        render_frame(time, chunk_size).await;
     }
 }
 
-async fn render_frame(camera_angle: f32, chunk_size: u32) {
+async fn render_frame(time: f32, chunk_size: u32) {
     // Ensure screenshots directory exists
     std::fs::create_dir_all("screenshots").expect("Failed to create screenshots directory");
+
+    // Calculate camera position from time using shared lib's orbital speed
+    let angular_velocity = toy4_spherical_chunks::DEFAULT_SPEED
+        / (toy4_spherical_chunks::PLANET_RADIUS + toy4_spherical_chunks::DEFAULT_ALTITUDE);
+    let camera_angle = angular_velocity * time;
 
     // Setup wgpu headless
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -152,28 +157,36 @@ async fn render_frame(camera_angle: f32, chunk_size: u32) {
         cache: Default::default(),
     });
 
-    // Create chunk using lib
+    // Create 3×3 chunk grid using lib (same as main.rs)
     let grid_spacing = 2.0;
-    let chunk_extent_meters = chunk_size as f32 * grid_spacing;
+    let chunk_extent_meters = (chunk_size - 1) as f32 * grid_spacing;
     let chunk_angular_size = chunk_extent_meters / PLANET_RADIUS;
 
-    let chunk_id = ChunkId::from_camera_angle(camera_angle, chunk_angular_size);
-    let chunk = Chunk::create(
-        &device,
-        &queue,
-        &compute_pipeline,
-        &compute_bind_group_layout,
-        chunk_id,
-        chunk_size,
-        grid_spacing,
-        chunk_angular_size,
-    );
+    let center_chunk_id = ChunkId::from_camera_angle(camera_angle, chunk_angular_size);
+    let needed_chunks = center_chunk_id.neighbors();
+
+    let mut chunks = Vec::new();
+    for chunk_id in needed_chunks {
+        let chunk = Chunk::create(
+            &device,
+            &queue,
+            &compute_pipeline,
+            &compute_bind_group_layout,
+            chunk_id,
+            chunk_size,
+            grid_spacing,
+            chunk_angular_size,
+        );
+        chunks.push(chunk);
+    }
 
     // Create camera using shared lib (ensures same altitude/orientation as main.rs)
-    let camera = toy4_spherical_chunks::OrbitCamera::at_angle(
-        toy4_spherical_chunks::DEFAULT_ALTITUDE,
-        camera_angle,
-    );
+    let camera = toy4_spherical_chunks::OrbitCamera {
+        altitude: toy4_spherical_chunks::DEFAULT_ALTITUDE,
+        angular_pos: camera_angle,
+        angular_velocity,
+        time,
+    };
     let camera_uniforms = camera.camera_uniforms(WIDTH as f32 / HEIGHT as f32, false);
 
     let camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
@@ -225,9 +238,13 @@ async fn render_frame(camera_angle: f32, chunk_size: u32) {
 
         render_pass.set_pipeline(&render_pipeline);
         render_pass.set_bind_group(0, &camera_bind_group, &[]);
-        render_pass.set_vertex_buffer(0, chunk.vertex_buffer.slice(..));
-        render_pass.set_index_buffer(chunk.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-        render_pass.draw_indexed(0..chunk.index_count, 0, 0..1);
+
+        // Render all chunks in the 3×3 grid
+        for chunk in &chunks {
+            render_pass.set_vertex_buffer(0, chunk.vertex_buffer.slice(..));
+            render_pass.set_index_buffer(chunk.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+            render_pass.draw_indexed(0..chunk.index_count, 0, 0..1);
+        }
     }
 
     queue.submit(std::iter::once(encoder.finish()));
@@ -285,7 +302,7 @@ async fn render_frame(camera_angle: f32, chunk_size: u32) {
         png_data.extend_from_slice(&data[start..end]);
     }
 
-    let filename = format!("screenshots/test_render_angle_{:.3}.png", camera_angle);
+    let filename = format!("screenshots/test_render_time_{:.3}.png", time);
     image::save_buffer(&filename, &png_data, WIDTH, HEIGHT, image::ColorType::Rgba8).unwrap();
 
     println!("Saved: {}", filename);

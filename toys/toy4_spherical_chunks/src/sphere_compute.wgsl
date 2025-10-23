@@ -7,6 +7,8 @@ struct Vertex {
     _padding2: vec2<f32>,
     normal: vec3<f32>,
     _padding3: f32,
+    grid_coord: vec2<f32>,
+    _padding4: vec2<f32>,
 }
 
 struct SphereParams {
@@ -172,7 +174,13 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // More robust than finite differences across chunk boundaries
     let normal = normalize(position);
 
+    // Calculate world-space grid coordinates (direct from integer grid cells)
+    // Use global grid cell coordinates directly - no lat/lon conversion to avoid precision loss
+    let global_x = params.chunk_origin_lon_cell + i32(grid_x);
+    let global_z = params.chunk_origin_lat_cell + i32(grid_z);
+
     vertices[idx].position = position;
     vertices[idx].uv = vec2<f32>(f32(grid_x) / f32(params.grid_size - 1), f32(grid_z) / f32(params.grid_size - 1));
     vertices[idx].normal = normal;
+    vertices[idx].grid_coord = vec2<f32>(f32(global_x), f32(global_z)); // Store grid cell indices, not meters
 }

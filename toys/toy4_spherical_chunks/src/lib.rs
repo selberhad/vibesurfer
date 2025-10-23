@@ -15,6 +15,8 @@ pub struct Vertex {
     pub _padding2: [f32; 2],
     pub normal: [f32; 3],
     pub _padding3: f32,
+    pub grid_coord: [f32; 2], // World-space grid coordinates (in meters)
+    pub _padding4: [f32; 2],
 }
 
 #[repr(C)]
@@ -198,6 +200,7 @@ pub struct OrbitCamera {
     pub altitude: f32,
     pub angular_pos: f32,
     pub angular_velocity: f32,
+    pub time: f32, // For lateral oscillation
 }
 
 impl OrbitCamera {
@@ -209,6 +212,7 @@ impl OrbitCamera {
             altitude,
             angular_pos: 0.0,
             angular_velocity,
+            time: 0.0,
         }
     }
 
@@ -217,12 +221,26 @@ impl OrbitCamera {
             altitude,
             angular_pos: angle,
             angular_velocity: 0.0,
+            time: 0.0,
         }
+    }
+
+    pub fn update(&mut self, dt: f32) {
+        self.angular_pos += self.angular_velocity * dt;
+        self.time += dt;
     }
 
     pub fn position(&self) -> glam::Vec3 {
         let r = PLANET_RADIUS + self.altitude;
-        let lat = 0.0_f32;
+
+        // Add lateral oscillation: +/- 50m sinusoidal movement
+        let oscillation_amplitude = 50.0; // meters
+        let oscillation_frequency = 0.3; // Hz (one cycle every ~3 seconds)
+        let lateral_offset = (self.time * oscillation_frequency * 2.0 * std::f32::consts::PI).sin()
+            * oscillation_amplitude;
+        let lat_offset = lateral_offset / PLANET_RADIUS;
+
+        let lat = lat_offset;
         let lon = self.angular_pos;
 
         glam::Vec3::new(
@@ -316,17 +334,22 @@ pub fn create_render_pipeline(
                     wgpu::VertexAttribute {
                         offset: 0,
                         shader_location: 0,
-                        format: wgpu::VertexFormat::Float32x3,
+                        format: wgpu::VertexFormat::Float32x3, // position
                     },
                     wgpu::VertexAttribute {
                         offset: 16,
                         shader_location: 1,
-                        format: wgpu::VertexFormat::Float32x2,
+                        format: wgpu::VertexFormat::Float32x2, // uv
                     },
                     wgpu::VertexAttribute {
                         offset: 32,
                         shader_location: 2,
-                        format: wgpu::VertexFormat::Float32x3,
+                        format: wgpu::VertexFormat::Float32x3, // normal
+                    },
+                    wgpu::VertexAttribute {
+                        offset: 48,
+                        shader_location: 3,
+                        format: wgpu::VertexFormat::Float32x2, // grid_coord
                     },
                 ],
             }],
@@ -343,10 +366,10 @@ pub fn create_render_pipeline(
             compilation_options: Default::default(),
         }),
         primitive: wgpu::PrimitiveState {
-            topology: wgpu::PrimitiveTopology::TriangleList,
+            topology: wgpu::PrimitiveTopology::LineList,
             strip_index_format: None,
             front_face: wgpu::FrontFace::Ccw,
-            cull_mode: None, // Disable to test if stripes are culling issue
+            cull_mode: None,
             polygon_mode: wgpu::PolygonMode::Fill,
             unclipped_depth: false,
             conservative: false,
@@ -367,21 +390,26 @@ pub fn create_render_pipeline(
 pub fn generate_grid_indices(grid_size: u32) -> Vec<u32> {
     let mut indices = Vec::new();
 
-    for z in 0..grid_size - 1 {
+    // Generate line indices for wireframe grid
+    // Only draw interior lines to avoid double-drawing at chunk boundaries
+
+    // Horizontal lines (skip top edge z=0 to avoid overlap with neighbor)
+    for z in 1..grid_size {
         for x in 0..grid_size - 1 {
-            let top_left = z * grid_size + x;
-            let top_right = top_left + 1;
-            let bottom_left = (z + 1) * grid_size + x;
-            let bottom_right = bottom_left + 1;
+            let current = z * grid_size + x;
+            let next = current + 1;
+            indices.push(current);
+            indices.push(next);
+        }
+    }
 
-            // Two triangles per quad
-            indices.push(top_left);
-            indices.push(bottom_left);
-            indices.push(bottom_right);
-
-            indices.push(top_left);
-            indices.push(bottom_right);
-            indices.push(top_right);
+    // Vertical lines (skip left edge x=0 to avoid overlap with neighbor)
+    for x in 1..grid_size {
+        for z in 0..grid_size - 1 {
+            let current = z * grid_size + x;
+            let next = (z + 1) * grid_size + x;
+            indices.push(current);
+            indices.push(next);
         }
     }
 

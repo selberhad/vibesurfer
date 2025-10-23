@@ -21,6 +21,7 @@ struct OrbitCamera {
     angular_pos: f32,      // Current angle around sphere (radians)
     angular_velocity: f32, // Orbital speed (rad/s)
     paused: bool,
+    time: f32, // Elapsed time for oscillation
 }
 
 impl OrbitCamera {
@@ -33,6 +34,7 @@ impl OrbitCamera {
             angular_pos: 0.0,
             angular_velocity,
             paused: false,
+            time: 0.0,
         }
     }
 
@@ -40,6 +42,7 @@ impl OrbitCamera {
         if !self.paused {
             self.angular_pos += self.angular_velocity * dt;
             self.angular_pos %= std::f32::consts::TAU; // Wrap at 2π
+            self.time += dt;
         }
     }
 
@@ -49,7 +52,12 @@ impl OrbitCamera {
     }
 
     fn as_lib_camera(&self) -> toy4_spherical_chunks::OrbitCamera {
-        toy4_spherical_chunks::OrbitCamera::at_angle(self.altitude, self.angular_pos)
+        toy4_spherical_chunks::OrbitCamera {
+            altitude: self.altitude,
+            angular_pos: self.angular_pos,
+            angular_velocity: self.angular_velocity,
+            time: self.time,
+        }
     }
 
     fn adjust_altitude(&mut self, delta: f32) {
@@ -434,9 +442,10 @@ impl App {
             KeyCode::KeyP => {
                 let pos = self.camera.position();
                 println!(
-                    "Camera: altitude={:.1}m, pos=[{:.1}, {:.1}, {:.1}], angle={:.3}rad",
-                    self.camera.altitude, pos.x, pos.y, pos.z, self.camera.angular_pos
+                    "Camera: altitude={:.1}m, pos=[{:.1}, {:.1}, {:.1}], angle={:.3}rad, time={:.2}s",
+                    self.camera.altitude, pos.x, pos.y, pos.z, self.camera.angular_pos, self.camera.time
                 );
+                println!("  Y position (lateral): {:.1}m", pos.y);
             }
             _ => {}
         }

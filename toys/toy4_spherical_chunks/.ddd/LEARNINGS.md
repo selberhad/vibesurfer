@@ -147,7 +147,58 @@ for id in needed_chunks {
 - ✅ Clean, simple solution (no shared buffer complexity)
 - ✅ Chunks remain fully independent (easy streaming)
 
+## Wireframe Rendering Artifacts (UNRESOLVED)
+
+**Problem:** Moiré/aliasing patterns visible at chunk boundaries, oscillating with camera position.
+
+**Observations:**
+- Artifact appears around chunk seams (confirmed with debug red boundaries)
+- Oscillates with camera lateral movement (50m sine wave oscillation)
+- Not related to chunk loading (happens with static 3×3 grid)
+- Not related to fog, lighting, or backface culling
+- Artifact "hovers around" the seam line based on viewing angle
+
+**Root cause:** Fragment shader-based wireframe rendering suffers from precision/aliasing issues.
+
+**Attempted fixes:**
+1. ❌ Anti-aliased wireframe using `fwidth` and `smoothstep` - no improvement
+2. ❌ Vertex attribute `grid_coord` to avoid per-fragment lat/lon calculation - still has artifacts
+3. ❌ Direct integer grid cell coordinates (avoid lat/lon roundtrip) - marginal improvement at best
+4. ❌ Coarser grid spacing (10m vs 2m) - just makes grid uglier, artifacts persist
+5. ❌ Backface culling enabled/disabled - no effect
+
+**Current implementation:**
+- Integer grid cell indices stored in vertex attributes (`grid_coord`)
+- Rasterizer interpolates these across triangles
+- Fragment shader uses `fract(grid_coord)` to detect grid lines
+- Smoothstep anti-aliasing with fwidth derivatives
+
+**Hypothesis:** The fundamental issue is that fragment shader-based wireframe rendering using `fract()` and distance fields creates aliasing when:
+- Grid coordinates are interpolated across triangles at chunk boundaries
+- Camera viewing angle causes precision issues in interpolated values
+- `fract()` amplifies tiny floating-point differences
+
+**Possible solutions not yet tried:**
+- Render wireframe as actual line geometry (LineList topology) - proper but requires separate render pass
+- Accept that fragment-based wireframe has inherent limitations at certain viewing angles
+
+**Status:** Documented as known issue. Wireframe is functional but has visual artifacts at chunk boundaries under certain camera angles. Not a blocker for gameplay.
+
+## Camera Lateral Oscillation (for testing)
+
+**Implementation:** Added lateral sine wave motion to test chunk boundary artifacts
+- `OrbitCamera` now has `time` field
+- Position calculates: `lat_offset = sin(time * 0.3Hz * 2π) * 50m / planet_radius`
+- Creates smooth 50m side-to-side oscillation (one cycle every ~3 seconds)
+- Helps diagnose artifacts that move with camera position vs chunk position
+
+**Shared lib approach:**
+- Both `main.rs` and `test_render.rs` use same `OrbitCamera` from lib
+- `test_render` takes time values as input, calculates camera position from time
+- Guarantees identical camera behavior across interactive and screenshot modes
+
 ## Open Questions
 - Does chunk grid need latitude expansion at higher latitudes? (Currently only longitude streaming)
 - What's the minimum chunk resolution before terrain aliasing becomes visible?
 - Can noise be computed in vertex shader instead of compute shader? (Would simplify but might hit performance limit)
+- Should wireframe be rendered as actual line geometry to eliminate artifacts?
