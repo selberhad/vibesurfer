@@ -13,6 +13,8 @@ pub struct Vertex {
     pub _padding1: f32,
     pub uv: [f32; 2],
     pub _padding2: [f32; 2],
+    pub normal: [f32; 3],
+    pub _padding3: f32,
 }
 
 #[repr(C)]
@@ -310,6 +312,11 @@ pub fn create_render_pipeline(
                         shader_location: 1,
                         format: wgpu::VertexFormat::Float32x2,
                     },
+                    wgpu::VertexAttribute {
+                        offset: 32,
+                        shader_location: 2,
+                        format: wgpu::VertexFormat::Float32x3,
+                    },
                 ],
             }],
             compilation_options: Default::default(),
@@ -325,10 +332,10 @@ pub fn create_render_pipeline(
             compilation_options: Default::default(),
         }),
         primitive: wgpu::PrimitiveState {
-            topology: wgpu::PrimitiveTopology::LineList,
+            topology: wgpu::PrimitiveTopology::TriangleList,
             strip_index_format: None,
             front_face: wgpu::FrontFace::Ccw,
-            cull_mode: None,
+            cull_mode: None, // Disable to test if stripes are culling issue
             polygon_mode: wgpu::PolygonMode::Fill,
             unclipped_depth: false,
             conservative: false,
@@ -356,15 +363,14 @@ pub fn generate_grid_indices(grid_size: u32) -> Vec<u32> {
             let bottom_left = (z + 1) * grid_size + x;
             let bottom_right = bottom_left + 1;
 
-            // Two triangles per quad (as lines)
+            // Two triangles per quad
             indices.push(top_left);
             indices.push(bottom_left);
-            indices.push(bottom_left);
             indices.push(bottom_right);
-            indices.push(bottom_right);
-            indices.push(top_right);
-            indices.push(top_right);
+
             indices.push(top_left);
+            indices.push(bottom_right);
+            indices.push(top_right);
         }
     }
 

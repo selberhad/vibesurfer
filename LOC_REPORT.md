@@ -1,6 +1,6 @@
 # Lines of Code Report
 
-**Last Updated**: 2025-10-23 14:42
+**Last Updated**: 2025-10-23 18:04
 **Tool**: [cloc](https://github.com/AlDanial/cloc) + wc
 
 ---
@@ -9,13 +9,13 @@
 
 | Metric | Rust Code | Documentation (.md) | Total |
 |--------|-----------|---------------------|-------|
-| **Lines** | 1,728 | 9,503 | 11,231 |
+| **Lines** | 1,728 | 8,863 | 10,591 |
 | **Comments** | 410 | - | 410 |
 | **Blank Lines** | 383 | - | 383 |
-| **Total Lines** | 2,521 | 9,503 | 12,024 |
-| **Files** | 18 | 30 | 48 |
+| **Total Lines** | 2,521 | 8,863 | 11,384 |
+| **Files** | 18 | 31 | 49 |
 
-**Documentation Ratio**: 5.50 lines of docs per line of code
+**Documentation Ratio**: 5.13 lines of docs per line of code
 
 ---
 
@@ -70,12 +70,13 @@ SUM:                            22            468            463           2002
 | `CODE_MAP.md` | 719 |
 | `COVERAGE_REPORT.md` | 68 |
 | `FLOWFIELD.md` | 97 |
+| `HANDOFF.md` | 194 |
 | `LEARNINGS.md` | 272 |
 | `learnings/.ddd/0_compute_shaders_complete.md` | 337 |
-| `learnings/.ddd/open_questions.md` | 362 |
-| `learnings/gpu_compute_fundamentals.md` | 330 |
-| `learnings/wgpu_compute_integration.md` | 736 |
-| `learnings/wgsl_compute_patterns.md` | 559 |
+| `learnings/.ddd/open_questions.md` | 366 |
+| `learnings/gpu_compute_fundamentals.md` | 206 |
+| `learnings/wgpu_compute_integration.md` | 343 |
+| `learnings/wgsl_compute_patterns.md` | 305 |
 | `LEXICON.md` | 84 |
 | `LOC_REPORT.md` | 120 |
 | `README.md` | 124 |
@@ -91,7 +92,7 @@ SUM:                            22            468            463           2002
 | `toys/toy3_infinite_camera/.ddd/PLAN.md` | 384 |
 | `toys/toy3_infinite_camera/.ddd/SPEC.md` | 347 |
 | `toys/toy3_infinite_camera/MATH_REVIEW.md` | 393 |
-| `toys/toy4_spherical_chunks/.ddd/LEARNINGS.md` | 238 |
+| `toys/toy4_spherical_chunks/.ddd/LEARNINGS.md` | 171 |
 | `toys/toy4_spherical_chunks/.ddd/SPEC.md` | 175 |
 | `VISION.md` | 50 |
 
@@ -101,7 +102,7 @@ SUM:                            22            468            463           2002
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| Docs/Code Ratio | ≥0.3 | 5.50 | ✅ Excellent |
+| Docs/Code Ratio | ≥0.3 | 5.13 | ✅ Excellent |
 | README exists | Yes | ✅ | Met |
 | ARCHITECTURE.md | Optional | ✅ | Optional |
 

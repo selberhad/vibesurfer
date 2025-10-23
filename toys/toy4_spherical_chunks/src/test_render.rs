@@ -55,6 +55,9 @@ async fn render_frames(angles: Vec<f32>, chunk_size: u32) {
 }
 
 async fn render_frame(camera_angle: f32, chunk_size: u32) {
+    // Ensure screenshots directory exists
+    std::fs::create_dir_all("screenshots").expect("Failed to create screenshots directory");
+
     // Setup wgpu headless
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
         backends: wgpu::Backends::all(),
@@ -282,7 +285,7 @@ async fn render_frame(camera_angle: f32, chunk_size: u32) {
         png_data.extend_from_slice(&data[start..end]);
     }
 
-    let filename = format!("test_render_angle_{:.3}.png", camera_angle);
+    let filename = format!("screenshots/test_render_angle_{:.3}.png", camera_angle);
     image::save_buffer(&filename, &png_data, WIDTH, HEIGHT, image::ColorType::Rgba8).unwrap();
 
     println!("Saved: {}", filename);

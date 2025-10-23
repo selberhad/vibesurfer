@@ -83,7 +83,89 @@ for id in needed_chunks {
 - Fog: Exponential, density 0.015
 - Noise: Base (10m @ 75m spacing) + Detail (3m @ 20m spacing)
 
+## Lighting & Surface Rendering
+
+**Lit surface + wireframe overlay creates retro aesthetic**
+- Dark teal surface (0.0, 0.15, 0.2) with directional lighting
+- Cyan wireframe (0.0, 1.0, 1.0) overlaid using UV-based grid detection
+- Lighting modulates both surface and wireframe for depth perception
+- Wireframe uses `fract(uv * 256)` to match chunk resolution
+
+**Compute shader normals required for seamless lighting**
+- Fragment shader derivatives (`dpdx`/`dpdy`) fail at chunk boundaries
+- Each chunk rendered separately → derivatives only see current triangle
+- Solution: Calculate normals in compute shader using finite differences
+- Access neighbor vertex positions for globally consistent normals
+- One-sided differences at grid edges (forward/backward vs central)
+
+**Vertex layout alignment matters for GPU**
+- 48-byte struct (3 vec4s): position(vec3+pad) + uv(vec2+pad2) + normal(vec3+pad)
+- WGSL requires proper padding for vec3 fields
+- Vertex attribute offsets: position@0, uv@16, normal@32
+
+**Performance unchanged with lighting**
+- 120 FPS with lit surface + wireframe (same as wireframe-only)
+- Normal calculation in compute shader adds zero overhead (computed once per chunk)
+- Validates "GPU compute is effectively free" at this scale
+
+**Known issue: Black stripe artifacts at chunk boundaries**
+
+**Root cause identified:** Sub-pixel gaps between independently-generated chunks
+- Each chunk generates 256×256 grid with its own coordinate system
+- Edge vertices in adjacent chunks calculate positions using different math (different chunk centers)
+- Floating-point precision differences create tiny gaps (< 1 pixel)
+- Gaps invisible with wireframe rendering (only edges visible)
+- Gaps show as black stripes with solid surface rendering (background shows through)
+
+**What DIDN'T work:**
+1. ❌ Disabling backface culling - Stripes persist (not a culling issue)
+2. ❌ Analytical sphere normals (`normalize(position)`) - Stripes persist (not a normal calculation issue)
+3. ❌ Finite difference normals with neighbor access - Stripes persist (normals are consistent)
+4. ❌ 0.5 cell grid offset for overlap - Stripes persist (chunks still use different centers)
+5. ❌ Global grid alignment from chunk corner - Stripes persist (floating-point still differs)
+
+**Why approaches failed:**
+- Each chunk uses `params.chunk_center_lon` to calculate all positions
+- Even with identical grid coordinates, different centers → different floating-point paths
+- `chunk_corner = center - offset` still accumulates different rounding errors per chunk
+
+**Potential solutions for future sessions:**
+
+1. **Shared vertex buffer approach**
+   - Create single global vertex buffer for all chunks
+   - Each chunk references subset of vertices (no duplication at edges)
+   - Requires: Global index mapping, more complex memory management
+   - Benefit: Guaranteed identical edge vertices (same memory location)
+
+2. **Explicit stitching with neighbor data**
+   - Pass neighbor chunk centers to compute shader
+   - Edge vertices query: "am I on boundary? Use neighbor's calculation"
+   - Requires: ChunkId-aware compute shader, neighbor lookup
+   - Benefit: Deterministic edge matching
+
+3. **Integer-based grid coordinates**
+   - Use global integer grid (lat_cell, lon_cell, grid_x, grid_z)
+   - Convert to float only for final sphere projection
+   - Minimizes floating-point accumulation differences
+   - Benefit: Bitwise-identical edge calculations
+
+4. **Accept artifacts, mask with rendering**
+   - Slightly thicken wireframe at chunk boundaries to cover gaps
+   - Or: use fog/depth bias to hide seams
+   - Benefit: Simple, no architectural changes
+   - Downside: Doesn't fix root cause
+
+5. **Increase chunk overlap to 1+ vertices**
+   - Generate 257×257 vertices (not 256×256)
+   - Render only interior 255×255 (skip edges)
+   - Neighboring chunks' interiors overlap by 1 vertex
+   - Benefit: Redundant calculation guarantees coverage
+   - Downside: 2% vertex overhead, z-fighting at overlaps
+
+**Recommended next step:** Implement approach #1 (shared vertex buffer) - the architecturally correct solution that guarantees perfect edge matching through shared memory.
+
 ## Open Questions
 - Does chunk grid need latitude expansion at higher latitudes? (Currently only longitude streaming)
 - What's the minimum chunk resolution before terrain aliasing becomes visible?
 - Can noise be computed in vertex shader instead of compute shader? (Would simplify but might hit performance limit)
+- Would integer-based grid coordinates eliminate floating-point precision gaps?

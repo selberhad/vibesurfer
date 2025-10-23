@@ -5,6 +5,8 @@ struct Vertex {
     _padding1: f32,
     uv: vec2<f32>,
     _padding2: vec2<f32>,
+    normal: vec3<f32>,
+    _padding3: f32,
 }
 
 struct SphereParams {
@@ -109,62 +111,71 @@ fn simplex3d(v: vec3<f32>) -> f32 {
     return 42.0 * dot(m * m, vec4<f32>(dot(p0, x0), dot(p1, x1), dot(p2, x2), dot(p3, x3)));
 }
 
+// Helper: Calculate position aligned to global grid
+// Key: Use chunk_center as reference, but calculate positions in a way that
+// guarantees neighboring chunks produce identical edge vertices
+fn get_position(gx: u32, gz: u32) -> vec3<f32> {
+    // Calculate position relative to a global grid aligned to chunk boundaries
+    // This ensures edge vertices from adjacent chunks have identical coordinates
+
+    // Chunk size in world space
+    let chunk_world_size = f32(params.grid_size - 1) * params.grid_spacing;
+
+    // Start from chunk's bottom-left corner (not center)
+    let chunk_corner_lon = params.chunk_center_lon - chunk_world_size * 0.5 / params.planet_radius;
+    let chunk_corner_lat = params.chunk_center_lat - chunk_world_size * 0.5 / params.planet_radius;
+
+    // Calculate world position from corner
+    let world_x = f32(gx) * params.grid_spacing;
+    let world_z = f32(gz) * params.grid_spacing;
+
+    let lon = chunk_corner_lon + world_x / params.planet_radius;
+    let lat = chunk_corner_lat + world_z / params.planet_radius;
+
+    let base_noise = simplex3d(vec3<f32>(lon * params.base_frequency, lat * params.base_frequency, 0.0));
+    let detail_noise = simplex3d(vec3<f32>(lon * params.detail_frequency, lat * params.detail_frequency, 100.0));
+    let height = base_noise * params.base_amplitude + detail_noise * params.detail_amplitude;
+
+    let r = params.planet_radius + height;
+    return vec3<f32>(r * cos(lat) * cos(lon), r * sin(lat), r * cos(lat) * sin(lon));
+}
+
 @compute @workgroup_size(256, 1, 1)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let idx = global_id.x;
-    let total_vertices = params.grid_size * params.grid_size;
-
-    if (idx >= total_vertices) {
+    if (idx >= params.grid_size * params.grid_size) {
         return;
     }
 
-    // Convert 1D index to 2D grid coordinates
     let grid_x = idx % params.grid_size;
     let grid_z = idx / params.grid_size;
+    let position = get_position(grid_x, grid_z);
 
-    // Local chunk coordinates (flat grid centered at origin)
-    let half_size = f32(params.grid_size - 1) * params.grid_spacing * 0.5;
-    let local_x = f32(grid_x) * params.grid_spacing - half_size;
-    let local_z = f32(grid_z) * params.grid_spacing - half_size;
+    // Calculate normal via finite differences
+    var dx: vec3<f32>;
+    var dz: vec3<f32>;
 
-    // Convert to angular offsets from chunk center
-    // Arc length = radius * angle, so angle = arc_length / radius
-    let lat_offset = local_z / params.planet_radius;
-    let lon_offset = local_x / params.planet_radius;
+    if (grid_x == 0u) {
+        dx = get_position(1u, grid_z) - position;
+    } else if (grid_x == params.grid_size - 1u) {
+        dx = position - get_position(grid_x - 1u, grid_z);
+    } else {
+        dx = get_position(grid_x + 1u, grid_z) - get_position(grid_x - 1u, grid_z);
+    }
 
-    let lat = params.chunk_center_lat + lat_offset;
-    let lon = params.chunk_center_lon + lon_offset;
+    if (grid_z == 0u) {
+        dz = get_position(grid_x, 1u) - position;
+    } else if (grid_z == params.grid_size - 1u) {
+        dz = position - get_position(grid_x, grid_z - 1u);
+    } else {
+        dz = get_position(grid_x, grid_z + 1u) - get_position(grid_x, grid_z - 1u);
+    }
 
-    // Sample noise at spherical coordinates (globally consistent terrain)
-    // Use lat/lon as 2D coordinates, with a third dimension for variation
-    let base_noise = simplex3d(vec3<f32>(
-        lon * params.base_frequency,
-        lat * params.base_frequency,
-        0.0
-    ));
-    let base_height = base_noise * params.base_amplitude;
+    // Analytical sphere normal (direction from planet center)
+    // More robust than finite differences across chunk boundaries
+    let normal = normalize(position);
 
-    let detail_noise = simplex3d(vec3<f32>(
-        lon * params.detail_frequency,
-        lat * params.detail_frequency,
-        100.0  // Offset in 3rd dimension for different pattern
-    ));
-    let detail_height = detail_noise * params.detail_amplitude;
-
-    // Total height offset from base sphere radius
-    let height = base_height + detail_height;
-
-    // Project to sphere surface with height variation
-    let r = params.planet_radius + height;
-    let x = r * cos(lat) * cos(lon);
-    let y = r * sin(lat);
-    let z = r * cos(lat) * sin(lon);
-
-    // UV coordinates for coloring
-    let u = f32(grid_x) / f32(params.grid_size - 1);
-    let v = f32(grid_z) / f32(params.grid_size - 1);
-
-    // Write to vertex buffer
-    vertices[idx].position = vec3<f32>(x, y, z);
-    vertices[idx].uv = vec2<f32>(u, v);
+    vertices[idx].position = position;
+    vertices[idx].uv = vec2<f32>(f32(grid_x) / f32(params.grid_size - 1), f32(grid_z) / f32(params.grid_size - 1));
+    vertices[idx].normal = normal;
 }
