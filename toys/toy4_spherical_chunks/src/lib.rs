@@ -23,6 +23,10 @@ pub struct SphereParams {
     pub chunk_center_lon: f32,
     pub grid_size: u32,
     pub grid_spacing: f32,
+    pub base_amplitude: f32,   // Height variation (meters)
+    pub base_frequency: f32,   // Noise scale
+    pub detail_amplitude: f32, // Detail layer height
+    pub detail_frequency: f32, // Detail layer scale
     pub _padding1: f32,
     pub _padding2: f32,
     pub _padding3: f32,
@@ -107,6 +111,10 @@ impl Chunk {
             chunk_center_lon: id.center_lon(chunk_angular_size),
             grid_size: chunk_size,
             grid_spacing,
+            base_amplitude: 10.0,      // 10m height variation
+            base_frequency: 13333.0,   // 75m hill spacing (1.0 / (75m / planet_radius))
+            detail_amplitude: 3.0,     // 3m detail variation
+            detail_frequency: 50000.0, // 20m detail spacing (1.0 / (20m / planet_radius))
             _padding1: 0.0,
             _padding2: 0.0,
             _padding3: 0.0,

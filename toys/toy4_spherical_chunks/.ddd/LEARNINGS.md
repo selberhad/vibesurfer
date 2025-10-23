@@ -174,15 +174,28 @@ Successfully converted project to Cargo workspace during this toy development.
    - Use radial direction: `pos.normalize()`
    - Ensures camera always looks down at surface below
 
+**8. Procedural Terrain via Simplex Noise**
+- **Problem:** Need globally consistent terrain height variation
+- **Solution:** 3D simplex noise sampled at lat/lon coordinates
+- **Implementation:**
+  - Copied simplex noise from toy3
+  - Sample at spherical coordinates (lat, lon, offset)
+  - Two layers: base hills (10m, 75m spacing) + detail (3m, 20m spacing)
+- **Frequency calculation:** `frequency = 1.0 / (desired_spacing_m / planet_radius)`
+  - Base: 13,333 for 75m hills
+  - Detail: 50,000 for 20m features
+- **Result:** ~7 hills per chunk, ~26 detail features per chunk, globally consistent
+
 ## Next Steps for Vibesurfer Integration
 
 ### Integration Path
-1. Apply chunk streaming to main ocean system
-2. Add distance fog for atmospheric depth
-3. Add audio-reactive terrain modulation (height offsets)
-4. Implement proper horizon/skybox
-5. Add wave animation on top of base mesh
-6. Consider exponential fog for more natural falloff
+1. ✅ Apply chunk streaming to main ocean system
+2. ✅ Add distance fog for atmospheric depth
+3. ✅ Add procedural terrain with noise
+4. Add audio-reactive terrain modulation (modulate noise amplitude)
+5. Implement proper horizon/skybox
+6. Add wave animation on top of base mesh
+7. Consider exponential fog for more natural falloff
 
 ## Key Learnings
 
@@ -190,11 +203,13 @@ Successfully converted project to Cargo workspace during this toy development.
 2. **Distance fog is free** - Fragment shader calculations have zero performance impact
 3. **Camera orientation is radial** - Use `pos.normalize()` as up vector for spherical terrain
 4. **Scale tuning is critical** - 30m altitude vs 100m completely changes feel
-5. **5×5 grid is the sweet spot** - Seamless coverage without performance cost
-6. **Linear fog works well** - Start at 0m, fade to black by 400m hides chunk streaming effectively
+5. **Fog-matched chunk grid** - 3×3 grid sufficient for 200m fog (was 5×5, optimized based on fog distance)
+6. **Linear fog works well** - Start at 0m, fade to black by 200m hides chunk streaming effectively
 7. **Prefactoring pays off** - `Chunk::create()` made grid expansion trivial
 8. **Workspace structure wins** - No more directory confusion
 9. **Aggressive fog necessary** - Subtle fog invisible; need strong gradient to hide distant geometry
+10. **Noise frequency must match scale** - Calculate analytically: `freq = 1.0 / (desired_spacing / radius)`
+11. **Simplex noise is globally consistent** - Sample at lat/lon ensures seamless chunk boundaries
 
 ## Files Modified
 
