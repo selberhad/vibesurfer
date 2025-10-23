@@ -35,13 +35,13 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // Distance from camera
     let distance = length(in.world_pos - camera.camera_pos);
 
-    // Fog parameters (very aggressive for clear visual effect)
-    let fog_start = 0.0;    // Fog starts immediately
-    let fog_end = 200.0;    // Fully fogged at 200m (was 400m)
+    // Fog parameters (exponential for smooth falloff)
+    let fog_density = 0.015;  // Controls fog thickness (higher = denser)
     let fog_color = vec3<f32>(0.0, 0.0, 0.0); // Black fog
 
-    // Calculate fog factor (0 = no fog, 1 = full fog)
-    let fog_factor = clamp((distance - fog_start) / (fog_end - fog_start), 0.0, 1.0);
+    // Calculate exponential fog factor (0 = no fog, 1 = full fog)
+    // exp2(-density * distance) gives smooth natural falloff
+    let fog_factor = 1.0 - exp2(-fog_density * distance);
 
     // Base color (cyan neon)
     let base_color = vec3<f32>(0.0, 1.0, 1.0);
