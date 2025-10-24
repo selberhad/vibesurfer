@@ -1,6 +1,6 @@
 # Lines of Code Report
 
-**Last Updated**: 2025-10-23 19:08
+**Last Updated**: 2025-10-24 00:41
 **Tool**: [cloc](https://github.com/AlDanial/cloc) + wc
 
 ---
@@ -9,13 +9,13 @@
 
 | Metric | Rust Code | Documentation (.md) | Total |
 |--------|-----------|---------------------|-------|
-| **Lines** | 1,728 | 8,897 | 10,625 |
+| **Lines** | 1,728 | 12,880 | 14,608 |
 | **Comments** | 410 | - | 410 |
 | **Blank Lines** | 383 | - | 383 |
-| **Total Lines** | 2,521 | 8,897 | 11,418 |
-| **Files** | 18 | 31 | 49 |
+| **Total Lines** | 2,521 | 12,880 | 15,401 |
+| **Files** | 18 | 39 | 57 |
 
-**Documentation Ratio**: 5.15 lines of docs per line of code
+**Documentation Ratio**: 7.45 lines of docs per line of code
 
 ---
 
@@ -64,17 +64,23 @@ SUM:                            22            468            463           2002
 
 | File | Lines |
 |------|-------|
+| `.hegel/research/PLAN.md` | 198 |
+| `.webcache/naga/naga-readme.md` | 86 |
 | `ARCHITECTURE.md` | 353 |
 | `CAMERA_REFACTOR.md` | 475 |
 | `CLAUDE.md` | 305 |
 | `CODE_MAP.md` | 719 |
 | `COVERAGE_REPORT.md` | 68 |
 | `FLOWFIELD.md` | 97 |
-| `HANDOFF.md` | 194 |
 | `LEARNINGS.md` | 272 |
 | `learnings/.ddd/0_compute_shaders_complete.md` | 337 |
+| `learnings/.ddd/0_naga_research_assessment.md` | 443 |
 | `learnings/.ddd/open_questions.md` | 366 |
 | `learnings/gpu_compute_fundamentals.md` | 206 |
+| `learnings/naga-architecture.md` | 365 |
+| `learnings/naga-reference.md` | 894 |
+| `learnings/naga-translation.md` | 599 |
+| `learnings/naga-validation.md` | 488 |
 | `learnings/wgpu_compute_integration.md` | 343 |
 | `learnings/wgsl_compute_patterns.md` | 305 |
 | `LEXICON.md` | 84 |
@@ -92,8 +98,10 @@ SUM:                            22            468            463           2002
 | `toys/toy3_infinite_camera/.ddd/PLAN.md` | 384 |
 | `toys/toy3_infinite_camera/.ddd/SPEC.md` | 347 |
 | `toys/toy3_infinite_camera/MATH_REVIEW.md` | 393 |
-| `toys/toy4_spherical_chunks/.ddd/LEARNINGS.md` | 204 |
+| `toys/toy4_spherical_chunks/.ddd/LEARNINGS.md` | 212 |
 | `toys/toy4_spherical_chunks/.ddd/SPEC.md` | 175 |
+| `toys/toy5_naga_exploration/.ddd/PLAN.md` | 622 |
+| `toys/toy5_naga_exploration/.ddd/SPEC.md` | 474 |
 | `VISION.md` | 50 |
 
 ---
@@ -102,7 +110,7 @@ SUM:                            22            468            463           2002
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| Docs/Code Ratio | ≥0.3 | 5.15 | ✅ Excellent |
+| Docs/Code Ratio | ≥0.3 | 7.45 | ✅ Excellent |
 | README exists | Yes | ✅ | Met |
 | ARCHITECTURE.md | Optional | ✅ | Optional |
 

@@ -1,0 +1,7 @@
+[package]
+name = "toy5_naga_exploration"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+naga = { version = "27", features = ["wgsl-in", "msl-out"] }

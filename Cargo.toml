@@ -6,6 +6,7 @@ members = [
     "toys/toy2_gpu_terrain_pipeline",
     "toys/toy3_infinite_camera",
     "toys/toy4_spherical_chunks",
+    "toys/toy5_naga_exploration",
 ]
 
 # Shared workspace configuration
