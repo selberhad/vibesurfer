@@ -1,6 +1,6 @@
 # Lines of Code Report
 
-**Last Updated**: 2025-10-24 00:41
+**Last Updated**: 2025-10-24 00:42
 **Tool**: [cloc](https://github.com/AlDanial/cloc) + wc
 
 ---
@@ -9,13 +9,13 @@
 
 | Metric | Rust Code | Documentation (.md) | Total |
 |--------|-----------|---------------------|-------|
-| **Lines** | 1,728 | 12,880 | 14,608 |
+| **Lines** | 1,728 | 12,888 | 14,616 |
 | **Comments** | 410 | - | 410 |
 | **Blank Lines** | 383 | - | 383 |
-| **Total Lines** | 2,521 | 12,880 | 15,401 |
+| **Total Lines** | 2,521 | 12,888 | 15,409 |
 | **Files** | 18 | 39 | 57 |
 
-**Documentation Ratio**: 7.45 lines of docs per line of code
+**Documentation Ratio**: 7.46 lines of docs per line of code
 
 ---
 
@@ -84,7 +84,7 @@ SUM:                            22            468            463           2002
 | `learnings/wgpu_compute_integration.md` | 343 |
 | `learnings/wgsl_compute_patterns.md` | 305 |
 | `LEXICON.md` | 84 |
-| `LOC_REPORT.md` | 121 |
+| `LOC_REPORT.md` | 129 |
 | `README.md` | 124 |
 | `REFACTOR_PLAN.md` | 391 |
 | `STUDY_PLAN.md` | 255 |
@@ -110,7 +110,7 @@ SUM:                            22            468            463           2002
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| Docs/Code Ratio | ≥0.3 | 7.45 | ✅ Excellent |
+| Docs/Code Ratio | ≥0.3 | 7.46 | ✅ Excellent |
 | README exists | Yes | ✅ | Met |
 | ARCHITECTURE.md | Optional | ✅ | Optional |
 
