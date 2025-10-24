@@ -263,50 +263,50 @@
 
 ## What Remains Uncertain (Needs Discovery)
 
-### Uncertainty 1: Practical Error Patterns
+### ✅ RESOLVED: Uncertainty 1 - Practical Error Patterns
 
-**What we don't know**: Common mistakes when writing WGSL for vibesurfer
-- Do binding errors happen often?
-- Are type errors obvious or subtle?
-- Do backend translation failures occur?
+**Discovery finding (Toy 5)**:
+- Parse errors are descriptive and caught early
+- Type errors caught at parse time (WGSL parser is strict)
+- Example: "automatic conversions cannot convert `{AbstractFloat}` to `vec4<f32>`"
+- Binding conflicts don't trigger validation errors (may be runtime check)
 
-**How to resolve**: Build toy, intentionally trigger errors, catalog patterns
+### ✅ RESOLVED: Uncertainty 2 - Real-World Translation Output
 
-### Uncertainty 2: Real-World Translation Output
+**Discovery finding (Toy 5)**:
+- MSL output is readable and production-ready (258 chars for simple shader)
+- Includes proper Metal 2.4 headers (`#include <metal_stdlib>`)
+- Clean structure with proper namespace usage (`metal::float4`)
+- No post-processing needed
 
-**What we don't know**: What MSL does Naga generate for vibesurfer shaders?
-- Is it readable?
-- Does it match hand-written MSL?
-- Are there inefficiencies?
+### ✅ RESOLVED: Uncertainty 3 - Performance in Practice
 
-**How to resolve**: Translate vibesurfer shaders with `naga-cli`, inspect MSL
+**Discovery finding (Toy 5)**:
+- Actual cost: **11μs total** (7μs parse, ~0μs validate, 4μs translate)
+- NOT 1ms—3 orders of magnitude faster than research estimate
+- Validation cost is unmeasurable (below measurement precision)
+- No need to cache for performance—runtime validation is essentially free
 
-### Uncertainty 3: Performance in Practice
+### ✅ RESOLVED: Uncertainty 4 - Build-Time Validation Value
 
-**What we don't know**: Actual Naga pipeline cost for vibesurfer
-- Is 1ms accurate for our shaders?
-- Does validation show up in profiling?
-- Should we cache translated shaders?
+**Discovery finding (Toy 5)**:
+- Runtime cost is negligible (11μs), so performance is not a driver
+- Build-time validation still useful for CI (catch errors before commit)
+- Recommended: Add to build.rs for error catching, not performance
 
-**How to resolve**: Benchmark parse + validate + translate on real shaders
+### ✅ RESOLVED: Uncertainty 5 - Platform Capability Constraints
 
-### Uncertainty 4: Build-Time Validation Value
+**Discovery finding (Toy 5)**:
+- Simple fragment shader validates with both `Capabilities::all()` and `Capabilities::default()`
+- No difference for basic shaders (as expected)
+- Complex shaders with advanced features would show difference
 
-**What we don't know**: Would build-time shader validation help vibesurfer development?
-- How often do shader changes break validation?
-- Would catching errors at build time save debugging time?
-- Is it worth adding to `build.rs`?
+### 🌀 REMAINING: Real Vibesurfer Shader Testing
 
-**How to resolve**: Track shader validation failures over development sessions
-
-### Uncertainty 5: Platform Capability Constraints
-
-**What we don't know**: Do vibesurfer shaders rely on features not in conservative Metal capabilities?
-- Would `Capabilities::default()` reject our shaders?
-- Do we use any Metal-specific extensions?
-- Are there cross-platform compatibility issues?
-
-**How to resolve**: Test validation with platform-specific capabilities
+**Still uncertain**: Performance and validation on actual vibesurfer shaders (toy4 wireframe, compute shaders)
+- Only tested simple 12-line fragment shader
+- Real shaders are more complex (fog, lighting, compute)
+- **Next step**: Test with `toys/toy4_spherical_chunks` shaders if needed
 
 ---
 
