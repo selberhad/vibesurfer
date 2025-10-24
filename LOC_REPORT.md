@@ -1,6 +1,6 @@
 # Lines of Code Report
 
-**Last Updated**: 2025-10-24 00:45
+**Last Updated**: 2025-10-24 00:50
 **Tool**: [cloc](https://github.com/AlDanial/cloc) + wc
 
 ---
@@ -9,13 +9,13 @@
 
 | Metric | Rust Code | Documentation (.md) | Total |
 |--------|-----------|---------------------|-------|
-| **Lines** | 1,728 | 12,888 | 14,616 |
+| **Lines** | 1,728 | 13,214 | 14,942 |
 | **Comments** | 410 | - | 410 |
 | **Blank Lines** | 383 | - | 383 |
-| **Total Lines** | 2,521 | 12,888 | 15,409 |
-| **Files** | 18 | 39 | 57 |
+| **Total Lines** | 2,521 | 13,214 | 15,735 |
+| **Files** | 18 | 41 | 59 |
 
-**Documentation Ratio**: 7.46 lines of docs per line of code
+**Documentation Ratio**: 7.65 lines of docs per line of code
 
 ---
 
@@ -78,7 +78,7 @@ SUM:                            22            468            463           2002
 | `learnings/.ddd/open_questions.md` | 366 |
 | `learnings/gpu_compute_fundamentals.md` | 206 |
 | `learnings/naga-architecture.md` | 365 |
-| `learnings/naga-reference.md` | 894 |
+| `learnings/naga-reference.md` | 898 |
 | `learnings/naga-translation.md` | 599 |
 | `learnings/naga-validation.md` | 488 |
 | `learnings/wgpu_compute_integration.md` | 343 |
@@ -100,8 +100,10 @@ SUM:                            22            468            463           2002
 | `toys/toy3_infinite_camera/MATH_REVIEW.md` | 393 |
 | `toys/toy4_spherical_chunks/.ddd/LEARNINGS.md` | 212 |
 | `toys/toy4_spherical_chunks/.ddd/SPEC.md` | 175 |
+| `toys/toy5_naga_exploration/.ddd/LEARNINGS.md` | 255 |
 | `toys/toy5_naga_exploration/.ddd/PLAN.md` | 622 |
 | `toys/toy5_naga_exploration/.ddd/SPEC.md` | 474 |
+| `toys/toy5_naga_exploration/README.md` | 67 |
 | `VISION.md` | 50 |
 
 ---
@@ -110,7 +112,7 @@ SUM:                            22            468            463           2002
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| Docs/Code Ratio | ≥0.3 | 7.46 | ✅ Excellent |
+| Docs/Code Ratio | ≥0.3 | 7.65 | ✅ Excellent |
 | README exists | Yes | ✅ | Met |
 | ARCHITECTURE.md | Optional | ✅ | Optional |
 

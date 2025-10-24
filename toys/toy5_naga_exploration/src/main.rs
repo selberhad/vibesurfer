@@ -22,6 +22,9 @@ fn main() {
     // Step 6: Error scenario tests
     test_errors();
 
+    // Step 7: Test with real vibesurfer shader
+    test_real_shader();
+
     println!("\n======================");
     println!("All tests passed! ✓");
 }
@@ -191,4 +194,72 @@ fn test_errors() {
     }
 
     println!("\n✓ Error handling validated (parse errors are caught and descriptive)");
+}
+
+fn test_real_shader() {
+    println!("\n--- Step 7: Real Shader (toy4) ---");
+
+    let wgsl = include_str!("../../toy4_spherical_chunks/src/sphere_render.wgsl");
+
+    // Parse
+    let start = Instant::now();
+    let module = wgsl::parse_str(wgsl).expect("Real shader should parse");
+    let parse_time = start.elapsed().as_micros();
+
+    println!("✓ Parsed toy4 sphere_render.wgsl");
+    println!("  Lines: ~52");
+    println!("  Entry points: {}", module.entry_points.len());
+    println!("  Types: {}", module.types.len());
+
+    // Validate
+    let start = Instant::now();
+    let mut validator = Validator::new(ValidationFlags::all(), Capabilities::all());
+    let module_info = validator
+        .validate(&module)
+        .expect("Real shader should validate");
+    let validate_time = start.elapsed().as_micros();
+
+    println!("✓ Validated with Capabilities::all()");
+
+    // Try with default capabilities
+    validator.reset();
+    let mut validator2 = Validator::new(ValidationFlags::all(), Capabilities::default());
+    match validator2.validate(&module) {
+        Ok(_) => println!("✓ Also validates with Capabilities::default()"),
+        Err(e) => println!("⚠ Requires advanced capabilities: {}", e),
+    }
+
+    // Translate to MSL
+    let start = Instant::now();
+    let mut msl_source = String::new();
+    msl::Writer::new(&mut msl_source)
+        .write(
+            &module,
+            &module_info,
+            &msl::Options {
+                lang_version: (2, 4),
+                ..Default::default()
+            },
+            &msl::PipelineOptions::default(),
+        )
+        .expect("Real shader should translate");
+    let translate_time = start.elapsed().as_micros();
+
+    println!("✓ Translated to MSL");
+    println!("  MSL output: {} chars", msl_source.len());
+    println!("\nPerformance (real shader):");
+    println!("  Parse:     {}μs", parse_time);
+    println!("  Validate:  {}μs", validate_time);
+    println!("  Translate: {}μs", translate_time);
+    println!(
+        "  Total:     {}μs",
+        parse_time + validate_time + translate_time
+    );
+
+    // Show snippet of MSL output
+    println!("\nMSL output (first 500 chars):");
+    println!("{}", &msl_source[..msl_source.len().min(500)]);
+    if msl_source.len() > 500 {
+        println!("... ({} more chars)", msl_source.len() - 500);
+    }
 }
